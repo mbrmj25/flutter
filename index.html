@@ -1,0 +1,2223 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flutter Me | منشئ التطبيقات المرئي الفوري</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cairo & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* تخصيص شريط التمرير والخلفية الشبكية لمساحة العمل */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        .canvas-grid {
+            background-size: 24px 24px;
+            background-image: 
+                linear-gradient(to right, rgba(99, 102, 241, 0.08) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+        }
+
+        .dark .canvas-grid {
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        }
+
+        .widget-wrapper {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .widget-wrapper:hover {
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+        }
+        .widget-selected {
+            box-shadow: 0 0 0 2px #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.04);
+        }
+        .drag-over {
+            border-color: #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.06) !important;
+        }
+        .free-dragging {
+            opacity: 0.9;
+            cursor: grabbing !important;
+            z-index: 40 !important;
+        }
+        /* إخفاء أدوات التحرير في وضع المعاينة الحية */
+        .preview-active .widget-wrapper {
+            box-shadow: none !important;
+            background-color: transparent !important;
+            padding: 0 !important;
+            cursor: default !important;
+        }
+        .preview-active .widget-controls {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- الشريط العلوي (Header / Action Bar) -->
+    <header class="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] px-4 flex items-center justify-between z-30 shrink-0">
+        <!-- الشعار واسم المشروع -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                <i data-lucide="layers" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-extrabold text-base tracking-tight bg-gradient-to-l from-indigo-500 to-sky-400 bg-clip-text text-transparent">Flutter Me</h1>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">الإصدار الاحترافي</span>
+                </div>
+                <input type="text" id="projectNameInput" value="مشروعي_الجديد" class="text-xs text-slate-500 dark:text-slate-400 bg-transparent border-none focus:outline-none focus:text-indigo-500 w-36 font-medium" title="انقر لتعديل اسم المشروع">
+            </div>
+        </div>
+
+        <!-- أدوات المعاينة وتبديل الشاشة (Desktop / Mobile) + وضع التشغيل -->
+        <div class="flex items-center gap-2">
+            <div class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                <button onclick="setViewport('desktop')" id="btnDesktop" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm">
+                    <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+                    <span>كمبيوتر</span>
+                </button>
+                <button onclick="setViewport('mobile')" id="btnMobile" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                    <span>جوال</span>
+                </button>
+            </div>
+
+            <!-- زر المعاينة الحية التفاعلية -->
+            <button onclick="togglePreviewMode()" id="btnPreviewMode" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold transition">
+                <i data-lucide="play" class="w-3.5 h-3.5" id="previewIcon"></i>
+                <span id="previewBtnText">معاينة حية</span>
+            </button>
+        </div>
+
+        <!-- أزرار الإجراءات السريعة واستخراج الكود -->
+        <div class="flex items-center gap-2">
+            <!-- زر تبديل السمة -->
+            <button onclick="toggleTheme()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition" title="تبديل الوضع الليلي/النهاري">
+                <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+            </button>
+
+            <!-- زر تفريغ الصفحة الحالية -->
+            <button onclick="clearCanvas()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-xs font-semibold transition" title="مسح عناصر الصفحة الحالية">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span class="hidden sm:inline">تفريغ الصفحة</span>
+            </button>
+
+            <!-- الزر الرئيسي: استخراج ونسخ الكود -->
+            <button onclick="openCodeModal()" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-indigo-600/25 transition transform active:scale-95">
+                <i data-lucide="code-2" class="w-4 h-4"></i>
+                <span>استخراج ونسخ الكود</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- شريط إدارة الصفحات المتعددة (Multi-Page Navigation Bar) -->
+    <div id="pagesBar" class="h-11 border-b border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-[#0e1422] px-4 flex items-center justify-between gap-3 z-20 shrink-0 overflow-x-auto">
+        <div class="flex items-center gap-1.5" id="pagesTabsContainer">
+            <!-- يتم توليد ألسنة الصفحات هنا برمجياً -->
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="addNewPage()" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-sm transition">
+                <i data-lucide="file-plus-2" class="w-3.5 h-3.5"></i>
+                <span>+ صفحة جديدة</span>
+            </button>
+            <button onclick="duplicateCurrentPage()" class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition" title="نسخ الصفحة الحالية">
+                <i data-lucide="copy-plus" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="promptRenameCurrentPage()" class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition" title="إعادة تسمية الصفحة">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="deleteCurrentPage()" class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/50 hover:bg-rose-500/10 text-rose-500 transition" title="حذف الصفحة الحالية">
+                <i data-lucide="file-minus" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- منطقة العمل الرئيسية (3 أعمدة) -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- 1. القائمة الجانبية اليمنى (مكتبة الأدوات الضخمة 30+ أداة + البحث الفوري) -->
+        <aside id="leftToolbox" class="w-64 lg:w-72 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] flex flex-col shrink-0 z-20 overflow-hidden transition-all">
+            <div class="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2 shrink-0">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="blocks" class="w-3.5 h-3.5 text-indigo-500"></i>
+                        <span>مكتبة الأدوات (30 أداة)</span>
+                    </h2>
+                    <span class="text-[10px] font-mono bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded">سحب أو نقر</span>
+                </div>
+                <!-- شريط البحث الفوري في الأدوات -->
+                <div class="relative">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5"></i>
+                    <input type="text" id="widgetSearchInput" oninput="renderToolbox()" placeholder="ابحث عن أداة (زر، جدول، فيديو...)" class="w-full pr-8 pl-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- قائمة الأدوات المصنفة القابلة للتمرير -->
+            <div id="toolboxCategoriesContainer" class="flex-1 overflow-y-auto p-3 space-y-4">
+                <!-- يتم توليد جميع الأقسام والأدوات ديناميكياً -->
+            </div>
+
+            <!-- قسم متطلبات المشروع البرمجية -->
+            <div class="p-3 border-t border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-emerald-500"></i>
+                    <span>متطلبات الكود والمشروع</span>
+                </h2>
+
+                <div class="space-y-1.5 text-[11px]">
+                    <label class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-white dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 cursor-pointer">
+                        <span class="font-medium">خادم Python Flask API</span>
+                        <input type="checkbox" id="reqBackend" checked class="accent-indigo-600 w-3.5 h-3.5 rounded">
+                    </label>
+
+                    <label class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-white dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 cursor-pointer">
+                        <span class="font-medium">قاعدة بيانات JSON دائمة</span>
+                        <input type="checkbox" id="reqDatabase" checked class="accent-indigo-600 w-3.5 h-3.5 rounded">
+                    </label>
+
+                    <label class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-white dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 cursor-pointer">
+                        <span class="font-medium">الوضع الليلي + زر الصعود</span>
+                        <input type="checkbox" id="reqDarkMode" checked class="accent-indigo-600 w-3.5 h-3.5 rounded">
+                    </label>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 2. مساحة العمل الفارغة في المنتصف (Live Canvas) -->
+        <main class="flex-1 canvas-grid overflow-y-auto p-4 sm:p-8 flex flex-col items-center relative" id="workspaceWrapper" onclick="deselectAll(event)">
+            
+            <!-- شريط معلومات سريع أعلى مساحة العمل -->
+            <div class="w-full max-w-4xl flex items-center justify-between mb-3 text-xs text-slate-400 px-1">
+                <div class="flex items-center gap-2">
+                    <span id="workspaceStatusDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="workspaceStatusText">مساحة العمل الحية — اختر أي عنصر لتحديد موضعه ووظيفته</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="activePageBadge" class="font-bold bg-indigo-500/15 text-indigo-500 px-2.5 py-0.5 rounded-md">الصفحة الرئيسية</span>
+                    <span id="elementCounter" class="font-mono bg-slate-200/70 dark:bg-slate-800 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">0 عناصر</span>
+                </div>
+            </div>
+
+            <!-- إطار التطبيق (يتغير حجمه بين كمبيوتر وجوال) -->
+            <div id="canvasContainer" 
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)" 
+                 ondrop="handleDrop(event)"
+                 class="w-full max-w-4xl min-h-[580px] bg-white dark:bg-[#131b2e] rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-xl transition-all duration-300 flex flex-col p-5 relative overflow-hidden">
+                
+                <!-- حالة البداية: مساحة فارغة تماماً وجاهزة -->
+                <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto pointer-events-none">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500 mb-4">
+                        <i data-lucide="plus-square" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-700 dark:text-slate-200 mb-1">هذه الصفحة فارغة وجاهزة للإبداع</h3>
+                    <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md leading-relaxed">
+                        اختر أداة من القائمة اليمنى (أكثر من 30 أداة)، ثم حددها لضبط <span class="text-indigo-500 font-bold">موضعها ووظيفتها أو ربطها بصفحة أخرى</span>.
+                    </p>
+                </div>
+
+                <!-- قائمة العناصر المضافة ستظهر هنا -->
+                <div id="canvasElements" class="space-y-3 w-full relative flex-1"></div>
+            </div>
+
+            <!-- زر سفلي عائم لسهولة الوصول السريع لاستخراج الكود -->
+            <div class="mt-6 mb-4 flex items-center gap-3">
+                <button onclick="openCodeModal()" class="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white font-bold text-sm shadow-xl transition transform hover:-translate-y-0.5">
+                    <i data-lucide="terminal" class="w-4 h-4"></i>
+                    <span>توليد ونسخ كود HTML + Python لجميع الصفحات</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- 3. لوحة خصائص العنصر المحدد والموضع والوظيفة (Advanced Properties Inspector) -->
+        <aside id="rightInspector" class="w-72 lg:w-80 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] flex flex-col shrink-0 z-20 overflow-y-auto transition-all">
+            <div class="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-500"></i>
+                    <span>الخصائص والموضع والوظيفة</span>
+                </h2>
+            </div>
+
+            <!-- محتوى الخصائص -->
+            <div id="inspectorContent" class="p-3.5 flex-1 flex flex-col">
+                <div class="my-auto text-center text-slate-400 py-8">
+                    <i data-lucide="mouse-pointer" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+                    <p class="text-xs leading-relaxed">انقر على أي زر أو عنصر داخل مساحة العمل لتخصيص شكله، موضعه (X/Y)، واختيار وظيفته البرمجية.</p>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- نافذة استخراج ونسخ الكود (Code Export Modal) -->
+    <div id="codeModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            
+            <!-- رأس النافذة -->
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                        <i data-lucide="file-code-2" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base">الكود البرمجي الجاهز لمشروعك</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">تم توليد كود الواجهة الأمامية (HTML) والخلفية (Python) بناءً على تصميمك</p>
+                    </div>
+                </div>
+                <button onclick="closeCodeModal()" class="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- ألسنة التبويب (HTML vs Python) وأزرار النسخ -->
+            <div class="px-5 py-3 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <button onclick="switchCodeTab('html')" id="tabHtml" class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-sm transition">
+                        <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+                        <span>كود HTML / CSS / JS</span>
+                    </button>
+                    <button onclick="switchCodeTab('python')" id="tabPython" class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 transition">
+                        <i data-lucide="terminal-square" class="w-3.5 h-3.5"></i>
+                        <span>كود Python (Flask Server)</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="downloadActiveCode()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>تحميل الملف</span>
+                    </button>
+                    <button onclick="copyActiveCode()" id="copyBtn" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span id="copyBtnText">نسخ الكود</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- منطقة عرض الكود -->
+            <div class="flex-1 overflow-auto bg-[#0d1117] p-4 relative" dir="ltr">
+                <pre class="text-xs sm:text-sm font-mono text-slate-200 leading-relaxed"><code id="codeOutputArea"></code></pre>
+            </div>
+
+            <!-- تذييل النافذة -->
+            <div class="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#111827] flex items-center justify-between text-xs text-slate-500">
+                <span>نصيحة: احفظ كود Python باسم <code class="text-indigo-500 font-mono">app.py</code> وكود HTML باسم <code class="text-indigo-500 font-mono">index.html</code></span>
+                <button onclick="closeCodeModal()" class="px-4 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold hover:opacity-90">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- إشعار منبثق (Toast Notification) -->
+    <div id="toast" class="fixed bottom-5 left-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 dark:bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 dark:text-white"></i>
+        <span id="toastMessage">تمت العملية بنجاح</span>
+    </div>
+
+    <!-- نافذة إدخال مخصصة (بديل أنيق لـ prompt لتسمية الصفحات) -->
+    <div id="renameModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+            <h3 class="font-bold text-base">تسمية الصفحة</h3>
+            <input type="text" id="renamePageInput" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:border-indigo-500" placeholder="أدخل اسم الصفحة...">
+            <div class="flex items-center justify-end gap-2">
+                <button onclick="closeRenameModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">إلغاء</button>
+                <button onclick="confirmRenamePage()" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-500">حفظ الاسم</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. الحالة المركزية ونظام الصفحات المتعددة (Multi-Page State)
+        // ==========================================
+        let pages = [
+            { id: 'page_home', name: 'الصفحة الرئيسية', slug: 'home', components: [] }
+        ];
+        let activePageId = 'page_home';
+        let selectedId = null;
+        let currentCodeTab = 'html';
+        let inspectorTab = 'style'; // 'style' | 'position' | 'action'
+        let isPreviewMode = false;
+        let generatedHtmlCode = '';
+        let generatedPythonCode = '';
+
+        // دوال مساعدة للوصول للصفحة النشطة وعناصرها بسهولة
+        function getActivePage() {
+            return pages.find(p => p.id === activePageId) || pages[0];
+        }
+        function getComponents() {
+            return getActivePage().components;
+        }
+        function setComponents(newArr) {
+            getActivePage().components = newArr;
+        }
+
+        // متغيرات السحب الحر للعناصر ذات التموضع الحر (X/Y)
+        let draggingCompId = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let initialCompX = 0;
+        let initialCompY = 0;
+
+        // الخصائص المشتركة للموضع والتنسيق لكل عنصر
+        const baseLayoutDefaults = {
+            posMode: 'flow', // 'flow' | 'free' | 'fixed'
+            posX: 40,
+            posY: 40,
+            fixedCorner: 'bottom-left',
+            align: 'center',
+            widthMode: 'auto', // 'auto' | 'full' | 'custom'
+            customWidth: 240,
+            paddingY: 12,
+            paddingX: 20,
+            marginY: 6,
+            borderRadius: 12,
+            shadow: 'md',
+            fontSize: 14
+        };
+
+        // تصنيفات مكتبة الأدوات الضخمة (30 أداة منظمة في 5 أقسام)
+        const toolboxCatalog = [
+            {
+                category: 'الأساسيات والنصوص',
+                items: [
+                    { type: 'heading', title: 'عنوان رئيسي', icon: 'heading-1', color: 'text-sky-500 bg-sky-500/10' },
+                    { type: 'text', title: 'فقرة ونص', icon: 'type', color: 'text-blue-500 bg-blue-500/10' },
+                    { type: 'badge', title: 'شارة / وسم', icon: 'tag', color: 'text-indigo-500 bg-indigo-500/10' },
+                    { type: 'alertBox', title: 'صندوق تنبيه', icon: 'alert-circle', color: 'text-amber-500 bg-amber-500/10' },
+                    { type: 'iconBox', title: 'أيقونة بارزة', icon: 'sparkles', color: 'text-purple-500 bg-purple-500/10' },
+                    { type: 'divider', title: 'فاصل أفقي', icon: 'minus', color: 'text-slate-500 bg-slate-500/10' },
+                    { type: 'spacer', title: 'مسافة فارغة', icon: 'move-vertical', color: 'text-teal-500 bg-teal-500/10' }
+                ]
+            },
+            {
+                category: 'الأزرار والتفاعل',
+                items: [
+                    { type: 'button', title: 'زر أساسي', icon: 'mouse-pointer-click', color: 'text-indigo-500 bg-indigo-500/10' },
+                    { type: 'gradientBtn', title: 'زر متدرج / نيون', icon: 'zap', color: 'text-fuchsia-500 bg-fuchsia-500/10' },
+                    { type: 'fabBtn', title: 'زر عائم (FAB)', icon: 'plus-circle', color: 'text-rose-500 bg-rose-500/10' },
+                    { type: 'btnGroup', title: 'مجموعة أزرار', icon: 'columns', color: 'text-violet-500 bg-violet-500/10' },
+                    { type: 'scrollTop', title: 'صعود للأعلى', icon: 'arrow-up-circle', color: 'text-teal-500 bg-teal-500/10' }
+                ]
+            },
+            {
+                category: 'المدخلات والنماذج',
+                items: [
+                    { type: 'input', title: 'حقل نصي', icon: 'text-cursor-input', color: 'text-emerald-500 bg-emerald-500/10' },
+                    { type: 'textarea', title: 'مربع نص كبير', icon: 'align-right', color: 'text-green-500 bg-green-500/10' },
+                    { type: 'select', title: 'قائمة منسدلة', icon: 'chevron-down-square', color: 'text-cyan-500 bg-cyan-500/10' },
+                    { type: 'checkbox', title: 'مربع اختيار', icon: 'check-square', color: 'text-sky-500 bg-sky-500/10' },
+                    { type: 'toggle', title: 'زر تبديل Switch', icon: 'toggle-right', color: 'text-indigo-500 bg-indigo-500/10' },
+                    { type: 'slider', title: 'شريط تمرير رقمي', icon: 'sliders-horizontal', color: 'text-orange-500 bg-orange-500/10' },
+                    { type: 'datePicker', title: 'تاريخ / لون', icon: 'calendar', color: 'text-pink-500 bg-pink-500/10' },
+                    { type: 'fileUpload', title: 'رفع ملفات', icon: 'upload-cloud', color: 'text-blue-500 bg-blue-500/10' },
+                    { type: 'searchBar', title: 'شريط بحث', icon: 'search', color: 'text-violet-500 bg-violet-500/10' },
+                    { type: 'form', title: 'نموذج متكامل', icon: 'clipboard-list', color: 'text-teal-500 bg-teal-500/10' }
+                ]
+            },
+            {
+                category: 'الوسائط والبيانات',
+                items: [
+                    { type: 'image', title: 'صورة', icon: 'image', color: 'text-pink-500 bg-pink-500/10' },
+                    { type: 'video', title: 'مشغل فيديو', icon: 'video', color: 'text-rose-500 bg-rose-500/10' },
+                    { type: 'card', title: 'بطاقة عرض', icon: 'credit-card', color: 'text-amber-500 bg-amber-500/10' },
+                    { type: 'statCard', title: 'بطاقة إحصائيات', icon: 'bar-chart-3', color: 'text-emerald-500 bg-emerald-500/10' },
+                    { type: 'progress', title: 'شريط تقدم', icon: 'loader', color: 'text-indigo-500 bg-indigo-500/10' },
+                    { type: 'table', title: 'جدول بيانات', icon: 'table', color: 'text-cyan-500 bg-cyan-500/10' },
+                    { type: 'list', title: 'قائمة عناصر', icon: 'list-checks', color: 'text-orange-500 bg-orange-500/10' },
+                    { type: 'accordion', title: 'أكورديون / سؤال', icon: 'chevrons-down-up', color: 'text-purple-500 bg-purple-500/10' },
+                    { type: 'modalBox', title: 'نافذة منبثقة', icon: 'app-window', color: 'text-sky-500 bg-sky-500/10' }
+                ]
+            },
+            {
+                category: 'التنقل والتخطيط',
+                items: [
+                    { type: 'navbar', title: 'شريط علوي (Navbar)', icon: 'panel-top', color: 'text-purple-500 bg-purple-500/10' },
+                    { type: 'bottomNav', title: 'شريط سفلي للجوال', icon: 'panel-bottom', color: 'text-indigo-500 bg-indigo-500/10' },
+                    { type: 'rowCards', title: 'صف بطاقات أفقي', icon: 'layout-grid', color: 'text-emerald-500 bg-emerald-500/10' },
+                    { type: 'footer', title: 'تذييل الصفحة', icon: 'copyright', color: 'text-slate-500 bg-slate-500/10' }
+                ]
+            }
+        ];
+
+        // القوالب الافتراضية لجميع الأدوات الـ 34
+        const componentDefaults = {
+            heading: {
+                type: 'heading', label: 'عنوان رئيسي', elementName: 'main_heading',
+                text: 'عنوان رئيسي جذاب لتطبيقك', color: '#4f46e5',
+                ...baseLayoutDefaults, align: 'right', widthMode: 'full', fontSize: 28, paddingX: 8, paddingY: 6
+            },
+            text: {
+                type: 'text', label: 'فقرة ونص', elementName: 'text_block',
+                text: 'مرحباً بك في تطبيقي الجديد',
+                subtext: 'هذا نص توضيحي يمكنك تعديله أو تغييره ديناميكياً عند النقر على الأزرار.',
+                color: '#1e293b',
+                ...baseLayoutDefaults, align: 'right', widthMode: 'full', fontSize: 18, paddingX: 8, paddingY: 6
+            },
+            badge: {
+                type: 'badge', label: 'شارة / وسم', elementName: 'status_badge',
+                text: 'جديد • إصدار 2.0', color: '#4f46e5', textColor: '#ffffff',
+                ...baseLayoutDefaults, borderRadius: 999, paddingX: 14, paddingY: 5, fontSize: 12
+            },
+            alertBox: {
+                type: 'alertBox', label: 'صندوق تنبيه', elementName: 'alert_banner',
+                title: 'تنبيه هام للمستخدم', text: 'يرجى التأكد من إكمال جميع الحقول المطلوبة قبل المتابعة.',
+                color: '#f59e0b',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 16, paddingY: 12
+            },
+            iconBox: {
+                type: 'iconBox', label: 'أيقونة بارزة', elementName: 'hero_icon',
+                iconName: 'rocket', caption: 'انطلاقة سريعة', color: '#6366f1',
+                ...baseLayoutDefaults, fontSize: 32, paddingX: 16, paddingY: 16
+            },
+            divider: {
+                type: 'divider', label: 'فاصل أفقي', elementName: 'line_divider',
+                color: '#cbd5e1',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 0, paddingY: 4
+            },
+            spacer: {
+                type: 'spacer', label: 'مسافة فارغة', elementName: 'empty_spacer',
+                spaceHeight: 32,
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 0, paddingY: 0, shadow: 'none'
+            },
+            button: {
+                type: 'button', label: 'زر أساسي', elementName: 'btn_action',
+                text: 'اضغط هنا للتنفيذ', color: '#4f46e5', textColor: '#ffffff',
+                ...baseLayoutDefaults,
+                actionType: 'toast', actionMsg: 'تم تنفيذ وظيفة الزر بنجاح!', actionPageId: '',
+                actionUrl: 'https://example.com', actionNewTab: true, apiEndpoint: '/api/submit',
+                targetElementId: '', newTargetText: 'تم تحديث النص!', counterStep: 1, customJsCode: "console.log('تم النقر');"
+            },
+            gradientBtn: {
+                type: 'gradientBtn', label: 'زر متدرج / نيون', elementName: 'btn_gradient',
+                text: 'ابدأ التجربة الآن ✨', color: '#6366f1', color2: '#ec4899', textColor: '#ffffff',
+                ...baseLayoutDefaults, borderRadius: 16, paddingX: 28, paddingY: 14,
+                actionType: 'toast', actionMsg: 'أهلاً بك في التجربة المميزة!', actionPageId: '',
+                actionUrl: 'https://example.com', actionNewTab: true, apiEndpoint: '/api/submit',
+                targetElementId: '', newTargetText: '', counterStep: 1, customJsCode: ''
+            },
+            fabBtn: {
+                type: 'fabBtn', label: 'زر عائم (FAB)', elementName: 'fab_add',
+                text: '+', color: '#e11d48', textColor: '#ffffff',
+                ...baseLayoutDefaults, posMode: 'fixed', fixedCorner: 'bottom-left',
+                borderRadius: 999, paddingX: 18, paddingY: 14, fontSize: 22,
+                actionType: 'toast', actionMsg: 'تم النقر على الزر العائم!', actionPageId: '',
+                actionUrl: '', actionNewTab: true, apiEndpoint: '/api/submit',
+                targetElementId: '', newTargetText: '', counterStep: 1, customJsCode: ''
+            },
+            btnGroup: {
+                type: 'btnGroup', label: 'مجموعة أزرار', elementName: 'btn_group',
+                btn1Text: 'موافق', btn2Text: 'إلغاء', color: '#4f46e5', color2: '#64748b',
+                ...baseLayoutDefaults,
+                actionType: 'toast', actionMsg: 'تم اختيار الإجراء الأول!', actionPageId: '',
+                actionUrl: '', actionNewTab: true, apiEndpoint: '/api/submit',
+                targetElementId: '', newTargetText: '', counterStep: 1, customJsCode: ''
+            },
+            scrollTop: {
+                type: 'scrollTop', label: 'زر الصعود للأعلى', elementName: 'scroll_top_btn',
+                text: 'للأعلى ↑', color: '#0d9488',
+                ...baseLayoutDefaults, posMode: 'fixed', fixedCorner: 'bottom-left',
+                borderRadius: 999, actionType: 'scroll_top'
+            },
+            input: {
+                type: 'input', label: 'حقل نصي', elementName: 'user_input',
+                fieldLabel: 'أدخل البيانات المطلوبة', placeholder: 'اكتب هنا...', inputType: 'text', required: true,
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 10
+            },
+            textarea: {
+                type: 'textarea', label: 'مربع نص كبير', elementName: 'notes_area',
+                fieldLabel: 'التفاصيل والملاحظات', placeholder: 'اكتب نصاً مفصلاً هنا...', rows: 3,
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 10
+            },
+            select: {
+                type: 'select', label: 'قائمة منسدلة', elementName: 'category_select',
+                fieldLabel: 'اختر التصنيف المناسب', options: 'الخيار الأول, الخيار الثاني, الخيار الثالث',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 10
+            },
+            checkbox: {
+                type: 'checkbox', label: 'مربع اختيار', elementName: 'agree_check',
+                text: 'أوافق على الشروط والأحكام وسياسة الخصوصية', checked: true, color: '#4f46e5',
+                ...baseLayoutDefaults, align: 'right', widthMode: 'full', paddingX: 12, paddingY: 8
+            },
+            toggle: {
+                type: 'toggle', label: 'زر تبديل Switch', elementName: 'notify_toggle',
+                text: 'تفعيل الإشعارات الفورية والتنبيهات', checked: true, color: '#10b981',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 10
+            },
+            slider: {
+                type: 'slider', label: 'شريط تمرير رقمي', elementName: 'range_slider',
+                fieldLabel: 'حدد القيمة المطلوبة', minVal: 0, maxVal: 100, defaultVal: 65, color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 10
+            },
+            datePicker: {
+                type: 'datePicker', label: 'تاريخ / لون', elementName: 'date_input',
+                fieldLabel: 'اختر التاريخ', pickerMode: 'date',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 10
+            },
+            fileUpload: {
+                type: 'fileUpload', label: 'رفع ملفات', elementName: 'file_uploader',
+                fieldLabel: 'اسحب الملفات هنا أو انقر للرفع', acceptTypes: 'PNG, JPG, PDF (حتى 10MB)',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 16, paddingY: 18
+            },
+            searchBar: {
+                type: 'searchBar', label: 'شريط بحث', elementName: 'search_box',
+                placeholder: 'ابحث في التطبيق...', buttonText: 'بحث', color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 12, paddingY: 8
+            },
+            form: {
+                type: 'form', label: 'نموذج متكامل', elementName: 'contact_form',
+                formTitle: 'نموذج تسجيل بيانات متصل بـ Python', submitText: 'إرسال وحفظ في الخادم',
+                color: '#10b981', ...baseLayoutDefaults, widthMode: 'full', apiEndpoint: '/api/submit'
+            },
+            image: {
+                type: 'image', label: 'صورة', elementName: 'app_image',
+                url: 'https://placehold.co/800x320/4f46e5/ffffff?text=Flutter+Me+App', caption: 'صورة توضيحية داخل التطبيق',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 0, paddingY: 0
+            },
+            video: {
+                type: 'video', label: 'مشغل فيديو', elementName: 'promo_video',
+                title: 'فيديو تعريفي بالتطبيق', duration: '02:45', color: '#e11d48',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 0, paddingY: 0
+            },
+            card: {
+                type: 'card', label: 'بطاقة عرض', elementName: 'info_card',
+                title: 'بطاقة معلومات مميزة', body: 'يمكنك استخدام هذه البطاقة لعرض خدماتك أو ربط زرها للانتقال لصفحة أخرى.',
+                buttonText: 'التفاصيل', color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full',
+                actionType: 'toast', actionMsg: 'تم النقر على زر البطاقة!', actionPageId: '',
+                actionUrl: 'https://example.com', actionNewTab: true, apiEndpoint: '/api/submit',
+                targetElementId: '', newTargetText: '', counterStep: 1, customJsCode: ''
+            },
+            statCard: {
+                type: 'statCard', label: 'بطاقة إحصائيات', elementName: 'kpi_stat',
+                title: 'إجمالي المستخدمين النشطين', value: '12,480', trend: '+18.5% هذا الشهر', color: '#10b981',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 18, paddingY: 16
+            },
+            progress: {
+                type: 'progress', label: 'شريط تقدم', elementName: 'task_progress',
+                title: 'نسبة إنجاز المشروع', percent: 75, color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 14, paddingY: 12
+            },
+            table: {
+                type: 'table', label: 'جدول بيانات', elementName: 'users_table',
+                headers: 'الاسم, البريد الإلكتروني, الحالة',
+                rowsData: 'أحمد محمد | ahmed@mail.com | نشط\nسارة علي | sara@mail.com | قيد المراجعة\nخالد عمر | khaled@mail.com | نشط',
+                color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 0, paddingY: 0
+            },
+            list: {
+                type: 'list', label: 'قائمة عناصر', elementName: 'task_list',
+                listTitle: 'قائمة العناصر والمهام',
+                items: 'تجهيز واجهة المستخدم, ربط الصفحات المتعددة, تشغيل خادم بايثون',
+                ...baseLayoutDefaults, widthMode: 'full'
+            },
+            accordion: {
+                type: 'accordion', label: 'أكورديون / سؤال', elementName: 'faq_item',
+                question: 'كيف يعمل نظام الصفحات المتعددة في Flutter Me؟',
+                answer: 'يمكنك إضافة أي عدد من الصفحات من الشريط العلوي، وربط أي زر للانتقال إليها مباشرة في المعاينة والكود المستخرج.',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 16, paddingY: 12
+            },
+            modalBox: {
+                type: 'modalBox', label: 'نافذة منبثقة', elementName: 'popup_modal',
+                title: 'رسالة تأكيد النظام', body: 'هل أنت متأكد من رغبتك في حفظ التغييرات والمتابعة؟',
+                confirmText: 'تأكيد وحفظ', color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 20, paddingY: 16
+            },
+            navbar: {
+                type: 'navbar', label: 'شريط علوي (Navbar)', elementName: 'main_navbar',
+                brand: 'تطبيقي', syncWithPages: true, links: 'الرئيسية, الخدمات, تواصل معنا', color: '#1e293b',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 16, paddingY: 12
+            },
+            bottomNav: {
+                type: 'bottomNav', label: 'شريط سفلي للجوال', elementName: 'mobile_bottom_nav',
+                syncWithPages: true, items: 'الرئيسية, البحث, حسابي', color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 12, paddingY: 10
+            },
+            rowCards: {
+                type: 'rowCards', label: 'صف بطاقات أفقي', elementName: 'cards_row',
+                card1Title: 'الباقة الأساسية', card1Desc: 'مناسبة للمشاريع الناشئة والتجربة السريعة.',
+                card2Title: 'الباقة الاحترافية', card2Desc: 'تشمل كافة المميزات وربط Python الكامل.',
+                color: '#4f46e5',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 0, paddingY: 0
+            },
+            footer: {
+                type: 'footer', label: 'تذييل الصفحة', elementName: 'app_footer',
+                text: 'جميع الحقوق محفوظة © 2026 — تم التطوير بواسطة Flutter Me', color: '#0f172a',
+                ...baseLayoutDefaults, widthMode: 'full', paddingX: 16, paddingY: 14, fontSize: 12
+            }
+        };
+
+        // أسماء الوظائف البرمجية للعرض في الواجهة (تشمل الانتقال بين الصفحات)
+        const actionLabels = {
+            none: 'بدون وظيفة (None)',
+            navigate_page: 'الانتقال إلى صفحة في التطبيق (Navigate Page) 📄',
+            toast: 'إظهار رسالة تنبيه (Alert / Toast)',
+            url: 'الانتقال إلى رابط خارجي (External URL)',
+            python_api: 'إرسال البيانات إلى خادم Python (POST API)',
+            toggle_el: 'إظهار / إخفاء عنصر في الصفحة (Toggle)',
+            update_text: 'تغيير نص عنصر آخر (Update Text)',
+            counter: 'زيادة / إنقاص عداد أو تقدم (Counter)',
+            scroll_top: 'التمرير لأعلى الصفحة (Scroll to Top)',
+            custom_js: 'كود JavaScript مخصص (Custom JS)'
+        };
+
+        // ==========================================
+        // 2. إدارة الصفحات المتعددة (Multi-Page System)
+        // ==========================================
+        function renderPagesBar() {
+            const container = document.getElementById('pagesTabsContainer');
+            const activePage = getActivePage();
+            document.getElementById('activePageBadge').textContent = activePage.name;
+
+            container.innerHTML = pages.map((page, idx) => {
+                const isActive = page.id === activePageId;
+                return `
+                    <button onclick="switchPage('${page.id}')" 
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${isActive ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-indigo-500/30' : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/40'}">
+                        <i data-lucide="${idx === 0 ? 'home' : 'file-text'}" class="w-3.5 h-3.5"></i>
+                        <span>${page.name}</span>
+                        <span class="text-[10px] opacity-60 font-mono">(${page.components.length})</span>
+                    </button>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function switchPage(pageId) {
+            const target = pages.find(p => p.id === pageId);
+            if (!target) return;
+            activePageId = pageId;
+            selectedId = null;
+            renderPagesBar();
+            renderCanvas();
+            renderInspector();
+        }
+
+        function addNewPage() {
+            const num = pages.length + 1;
+            const defaultNames = ['تسجيل الدخول', 'لوحة التحكم', 'الإعدادات', 'الملف الشخصي', 'تواصل معنا'];
+            const suggestedName = defaultNames[pages.length - 1] || `صفحة ${num}`;
+            const newId = 'page_' + Date.now().toString(36);
+            pages.push({
+                id: newId,
+                name: suggestedName,
+                slug: `page_${num}`,
+                components: []
+            });
+            switchPage(newId);
+            showToast(`تم إنشاء صفحة "${suggestedName}"`);
+        }
+
+        function duplicateCurrentPage() {
+            const current = getActivePage();
+            const newId = 'page_' + Date.now().toString(36);
+            const clonedComponents = JSON.parse(JSON.stringify(current.components)).map(c => ({
+                ...c,
+                id: 'el_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1000)
+            }));
+            pages.push({
+                id: newId,
+                name: `${current.name} (نسخة)`,
+                slug: `${current.slug}_copy`,
+                components: clonedComponents
+            });
+            switchPage(newId);
+            showToast('تم نسخ الصفحة وعناصرها بنجاح');
+        }
+
+        function promptRenameCurrentPage() {
+            const current = getActivePage();
+            document.getElementById('renamePageInput').value = current.name;
+            document.getElementById('renameModal').classList.remove('hidden');
+            document.getElementById('renameModal').classList.add('flex');
+            document.getElementById('renamePageInput').focus();
+        }
+
+        function closeRenameModal() {
+            document.getElementById('renameModal').classList.add('hidden');
+            document.getElementById('renameModal').classList.remove('flex');
+        }
+
+        function confirmRenamePage() {
+            const val = document.getElementById('renamePageInput').value.trim();
+            if (val) {
+                getActivePage().name = val;
+                renderPagesBar();
+                renderCanvas();
+                showToast(`تم تغيير اسم الصفحة إلى "${val}"`);
+            }
+            closeRenameModal();
+        }
+
+        function deleteCurrentPage() {
+            if (pages.length <= 1) {
+                showToast('لا يمكن حذف الصفحة الوحيدة في المشروع');
+                return;
+            }
+            const deletedName = getActivePage().name;
+            pages = pages.filter(p => p.id !== activePageId);
+            activePageId = pages[0].id;
+            selectedId = null;
+            renderPagesBar();
+            renderCanvas();
+            renderInspector();
+            showToast(`تم حذف صفحة "${deletedName}"`);
+        }
+
+        // ==========================================
+        // 3. رسم مكتبة الأدوات الضخمة مع البحث الفوري
+        // ==========================================
+        function renderToolbox() {
+            const container = document.getElementById('toolboxCategoriesContainer');
+            const query = (document.getElementById('widgetSearchInput').value || '').trim().toLowerCase();
+
+            let html = '';
+            toolboxCatalog.forEach(group => {
+                const filtered = group.items.filter(item =>
+                    item.title.toLowerCase().includes(query) ||
+                    item.type.toLowerCase().includes(query) ||
+                    group.category.toLowerCase().includes(query)
+                );
+
+                if (filtered.length === 0) return;
+
+                html += `
+                    <div>
+                        <h3 class="text-[11px] font-bold text-slate-400 mb-2 px-0.5">${group.category}</h3>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            ${filtered.map(item => `
+                                <div draggable="true" ondragstart="handleDragStart(event, '${item.type}')" onclick="addComponent('${item.type}')" 
+                                     class="cursor-pointer group p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-indigo-500 hover:bg-indigo-500/5 transition flex flex-col items-center justify-center gap-1.5 text-center">
+                                    <div class="w-7 h-7 rounded-lg ${item.color} flex items-center justify-center group-hover:scale-110 transition">
+                                        <i data-lucide="${item.icon}" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                    <span class="text-[11px] font-semibold leading-tight">${item.title}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (!html) {
+                html = `<div class="text-center py-8 text-xs text-slate-400">لا توجد أداة مطابقة لبحثك</div>`;
+            }
+
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        // إظهار إشعار سريع
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2600);
+        }
+
+        // تبديل الوضع الليلي / النهاري
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        // تبديل وضع المعاينة الحية التفاعلية
+        function togglePreviewMode() {
+            isPreviewMode = !isPreviewMode;
+            const canvas = document.getElementById('canvasContainer');
+            const btn = document.getElementById('btnPreviewMode');
+            const btnText = document.getElementById('previewBtnText');
+            const statusText = document.getElementById('workspaceStatusText');
+            const toolbox = document.getElementById('leftToolbox');
+            const inspector = document.getElementById('rightInspector');
+
+            if (isPreviewMode) {
+                selectedId = null;
+                canvas.classList.add('preview-active');
+                btn.classList.remove('bg-emerald-500/10', 'text-emerald-600', 'dark:text-emerald-400');
+                btn.classList.add('bg-amber-500', 'text-white', 'border-amber-500');
+                btnText.textContent = 'العودة للتحرير';
+                statusText.textContent = 'وضع المعاينة الحية — جرب النقر على الأزرار والتنقل بين الصفحات!';
+                toolbox.classList.add('opacity-40', 'pointer-events-none');
+                inspector.classList.add('opacity-40', 'pointer-events-none');
+                showToast('تم تفعيل المعاينة الحية! جرب التنقل بين الصفحات والأزرار');
+            } else {
+                canvas.classList.remove('preview-active');
+                btn.classList.add('bg-emerald-500/10', 'text-emerald-600', 'dark:text-emerald-400');
+                btn.classList.remove('bg-amber-500', 'text-white', 'border-amber-500');
+                btnText.textContent = 'معاينة حية';
+                statusText.textContent = 'مساحة العمل الحية — اختر أي عنصر لتحديد موضعه ووظيفته';
+                toolbox.classList.remove('opacity-40', 'pointer-events-none');
+                inspector.classList.remove('opacity-40', 'pointer-events-none');
+            }
+            renderCanvas();
+            renderInspector();
+        }
+
+        // تغيير حجم شاشة المعاينة (كمبيوتر / جوال)
+        function setViewport(mode) {
+            const container = document.getElementById('canvasContainer');
+            const btnDesktop = document.getElementById('btnDesktop');
+            const btnMobile = document.getElementById('btnMobile');
+
+            if (mode === 'mobile') {
+                container.classList.remove('max-w-4xl');
+                container.classList.add('max-w-[390px]', 'rounded-[2.2rem]', 'border-4');
+                btnMobile.classList.add('bg-white', 'dark:bg-slate-700', 'text-indigo-600', 'dark:text-white', 'shadow-sm');
+                btnMobile.classList.remove('text-slate-500', 'dark:text-slate-400');
+                btnDesktop.classList.remove('bg-white', 'dark:bg-slate-700', 'text-indigo-600', 'dark:text-white', 'shadow-sm');
+                btnDesktop.classList.add('text-slate-500', 'dark:text-slate-400');
+            } else {
+                container.classList.add('max-w-4xl');
+                container.classList.remove('max-w-[390px]', 'rounded-[2.2rem]', 'border-4');
+                btnDesktop.classList.add('bg-white', 'dark:bg-slate-700', 'text-indigo-600', 'dark:text-white', 'shadow-sm');
+                btnDesktop.classList.remove('text-slate-500', 'dark:text-slate-400');
+                btnMobile.classList.remove('bg-white', 'dark:bg-slate-700', 'text-indigo-600', 'dark:text-white', 'shadow-sm');
+                btnMobile.classList.add('text-slate-500', 'dark:text-slate-400');
+            }
+        }
+
+        // دوال السحب والإفلات من القائمة الجانبية
+        function handleDragStart(e, type) {
+            e.dataTransfer.setData('componentType', type);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('canvasContainer').classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            document.getElementById('canvasContainer').classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('canvasContainer').classList.remove('drag-over');
+            const type = e.dataTransfer.getData('componentType');
+            if (type) addComponent(type);
+        }
+
+        // إضافة عنصر جديد إلى الصفحة النشطة
+        function addComponent(type) {
+            if (isPreviewMode) return;
+            const template = componentDefaults[type];
+            if (!template) return;
+
+            const comps = getComponents();
+            const indexNum = comps.filter(c => c.type === type).length + 1;
+            const newComp = {
+                id: 'el_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 100),
+                ...JSON.parse(JSON.stringify(template)),
+                elementName: `${template.elementName}_${indexNum}`
+            };
+
+            comps.push(newComp);
+            selectedId = newComp.id;
+            if (['button', 'gradientBtn', 'fabBtn', 'btnGroup'].includes(type)) {
+                inspectorTab = 'action';
+            } else {
+                inspectorTab = 'style';
+            }
+            renderPagesBar();
+            renderCanvas();
+            renderInspector();
+            showToast(`تمت إضافة "${template.label}" إلى ${getActivePage().name}`);
+        }
+
+        function selectComponent(e, id) {
+            if (isPreviewMode) return;
+            e.stopPropagation();
+            selectedId = id;
+            renderCanvas();
+            renderInspector();
+        }
+
+        function deselectAll(e) {
+            if (isPreviewMode) return;
+            if (e.target.id === 'workspaceWrapper' || e.target.id === 'canvasContainer' || e.target.id === 'canvasElements') {
+                selectedId = null;
+                renderCanvas();
+                renderInspector();
+            }
+        }
+
+        function deleteComponent(e, id) {
+            e.stopPropagation();
+            setComponents(getComponents().filter(c => c.id !== id));
+            if (selectedId === id) selectedId = null;
+            renderPagesBar();
+            renderCanvas();
+            renderInspector();
+        }
+
+        function moveComponent(e, id, direction) {
+            e.stopPropagation();
+            const comps = getComponents();
+            const idx = comps.findIndex(c => c.id === id);
+            if (idx === -1) return;
+            const newIdx = idx + direction;
+            if (newIdx < 0 || newIdx >= comps.length) return;
+
+            const temp = comps[idx];
+            comps[idx] = comps[newIdx];
+            comps[newIdx] = temp;
+            renderCanvas();
+        }
+
+        function clearCanvas() {
+            if (getComponents().length === 0) return;
+            setComponents([]);
+            selectedId = null;
+            renderPagesBar();
+            renderCanvas();
+            renderInspector();
+            showToast('تم تفريغ عناصر الصفحة الحالية');
+        }
+
+        function updateProp(key, value, rerenderInspector = false) {
+            const comp = getComponents().find(c => c.id === selectedId);
+            if (!comp) return;
+            comp[key] = value;
+            renderCanvas();
+            if (rerenderInspector) renderInspector();
+        }
+
+        function switchInspectorTab(tab) {
+            inspectorTab = tab;
+            renderInspector();
+        }
+
+        // التحريك الحر بالماوس داخل مساحة العمل (X / Y)
+        function startFreeDrag(e, id) {
+            if (isPreviewMode) return;
+            const comp = getComponents().find(c => c.id === id);
+            if (!comp || comp.posMode !== 'free') return;
+            if (e.target.tagName === 'BUTTON' && e.target.dataset.control) return;
+
+            draggingCompId = id;
+            selectedId = id;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            initialCompX = Number(comp.posX) || 0;
+            initialCompY = Number(comp.posY) || 0;
+
+            document.addEventListener('mousemove', onFreeDragMove);
+            document.addEventListener('mouseup', stopFreeDrag);
+        }
+
+        function onFreeDragMove(e) {
+            if (!draggingCompId) return;
+            const comp = getComponents().find(c => c.id === draggingCompId);
+            if (!comp) return;
+
+            const dx = e.clientX - dragStartX;
+            const dy = e.clientY - dragStartY;
+            comp.posX = Math.max(0, Math.round(initialCompX + dx));
+            comp.posY = Math.max(0, Math.round(initialCompY + dy));
+
+            renderCanvas();
+            const inputX = document.getElementById('propPosX');
+            const inputY = document.getElementById('propPosY');
+            if (inputX) inputX.value = comp.posX;
+            if (inputY) inputY.value = comp.posY;
+        }
+
+        function stopFreeDrag() {
+            draggingCompId = null;
+            document.removeEventListener('mousemove', onFreeDragMove);
+            document.removeEventListener('mouseup', stopFreeDrag);
+        }
+
+        // تنفيذ وظيفة الزر أو التنقل بين الصفحات في المعاينة الحية
+        function executeComponentAction(e, id) {
+            const comp = getComponents().find(c => c.id === id);
+            if (!comp) return;
+
+            if (!isPreviewMode) {
+                selectComponent(e, id);
+                return;
+            }
+
+            e.stopPropagation();
+            const action = comp.actionType || 'none';
+
+            switch (action) {
+                case 'none':
+                    break;
+                case 'navigate_page':
+                    if (comp.actionPageId && pages.some(p => p.id === comp.actionPageId)) {
+                        switchPage(comp.actionPageId);
+                        showToast(`تم الانتقال إلى: ${getActivePage().name}`);
+                    } else {
+                        showToast('يرجى تحديد الصفحة المستهدفة من خصائص الزر');
+                    }
+                    break;
+                case 'toast':
+                    showToast(comp.actionMsg || 'تم النقر على الزر');
+                    break;
+                case 'url':
+                    if (comp.actionUrl) {
+                        if (comp.actionNewTab) window.open(comp.actionUrl, '_blank');
+                        else showToast(`الانتقال إلى: ${comp.actionUrl}`);
+                    }
+                    break;
+                case 'python_api':
+                    const inputs = document.querySelectorAll('#canvasElements input[data-field-name], #canvasElements textarea[data-field-name], #canvasElements select[data-field-name]');
+                    const collected = {};
+                    inputs.forEach(inp => {
+                        collected[inp.dataset.fieldName] = inp.type === 'checkbox' ? inp.checked : inp.value;
+                    });
+                    showToast(`تم الإرسال إلى Python (${comp.apiEndpoint}): ${JSON.stringify(collected)}`);
+                    break;
+                case 'toggle_el':
+                    if (comp.targetElementId) {
+                        const targetDom = document.getElementById(`dom_${comp.targetElementId}`);
+                        if (targetDom) targetDom.classList.toggle('hidden');
+                    }
+                    break;
+                case 'update_text':
+                    if (comp.targetElementId) {
+                        const targetComp = getComponents().find(c => c.id === comp.targetElementId);
+                        if (targetComp) {
+                            if (['text', 'heading', 'button', 'badge'].includes(targetComp.type)) targetComp.text = comp.newTargetText;
+                            else if (targetComp.type === 'card') targetComp.title = comp.newTargetText;
+                            renderCanvas();
+                        }
+                    }
+                    break;
+                case 'counter':
+                    const step = parseInt(comp.counterStep) || 1;
+                    if (comp.targetElementId) {
+                        const targetComp = getComponents().find(c => c.id === comp.targetElementId);
+                        if (targetComp) {
+                            if (targetComp.type === 'progress') {
+                                targetComp.percent = Math.min(100, Math.max(0, (Number(targetComp.percent) || 0) + step));
+                            } else {
+                                const cur = parseInt(String(targetComp.text || targetComp.value || '0').replace(/[^\d-]/g, '')) || 0;
+                                if ('value' in targetComp) targetComp.value = String(cur + step);
+                                else targetComp.text = String(cur + step);
+                            }
+                            renderCanvas();
+                        }
+                    } else {
+                        const num = parseInt(comp.text.replace(/[^\d-]/g, '')) || 0;
+                        comp.text = `العداد: ${num + step}`;
+                        renderCanvas();
+                    }
+                    break;
+                case 'scroll_top':
+                    document.getElementById('workspaceWrapper').scrollTo({ top: 0, behavior: 'smooth' });
+                    showToast('تم الصعود لأعلى الصفحة');
+                    break;
+                case 'custom_js':
+                    try {
+                        new Function(comp.customJsCode || '')();
+                        showToast('تم تنفيذ الكود المخصص');
+                    } catch (err) {
+                        showToast('خطأ برمجي: ' + err.message);
+                    }
+                    break;
+            }
+        }
+
+        function getShadowClass(shadow) {
+            if (shadow === 'none') return 'shadow-none';
+            if (shadow === 'sm') return 'shadow-sm';
+            if (shadow === 'xl') return 'shadow-xl';
+            return 'shadow-md';
+        }
+
+        // ==========================================
+        // 4. رسم جميع العناصر الـ 34 داخل مساحة العمل
+        // ==========================================
+        function renderCanvas() {
+            const container = document.getElementById('canvasElements');
+            const emptyState = document.getElementById('emptyState');
+            const counter = document.getElementById('elementCounter');
+            const canvasBox = document.getElementById('canvasContainer');
+            const comps = getComponents();
+
+            counter.textContent = `${comps.length} عناصر`;
+
+            if (comps.length === 0) {
+                emptyState.classList.remove('hidden');
+                container.innerHTML = '';
+                canvasBox.classList.add('border-dashed');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            canvasBox.classList.remove('border-dashed');
+
+            container.innerHTML = comps.map((c) => {
+                const isSelected = c.id === selectedId && !isPreviewMode;
+                let innerHtml = '';
+
+                let wrapperStyle = `margin-top: ${c.marginY || 0}px; margin-bottom: ${c.marginY || 0}px;`;
+                let wrapperPosClass = 'relative';
+
+                if (c.posMode === 'free') {
+                    wrapperPosClass = 'absolute z-20 cursor-move';
+                    wrapperStyle = `left: ${c.posX}px; top: ${c.posY}px;`;
+                } else if (c.posMode === 'fixed') {
+                    wrapperPosClass = 'absolute z-30';
+                    const cornerMap = {
+                        'bottom-left': 'bottom: 16px; left: 16px;',
+                        'bottom-right': 'bottom: 16px; right: 16px;',
+                        'top-left': 'top: 16px; left: 16px;',
+                        'top-right': 'top: 16px; right: 16px;'
+                    };
+                    wrapperStyle = cornerMap[c.fixedCorner] || cornerMap['bottom-left'];
+                }
+
+                const widthStyle = c.widthMode === 'full' ? 'width: 100%;' : (c.widthMode === 'custom' ? `width: ${c.customWidth}px;` : '');
+                const shadowCls = getShadowClass(c.shadow);
+                const alignClass = c.align === 'center' ? 'justify-center' : (c.align === 'left' ? 'justify-end' : 'justify-start');
+                const textAlign = c.align === 'center' ? 'text-center' : (c.align === 'left' ? 'text-left' : 'text-right');
+
+                switch (c.type) {
+                    case 'heading':
+                        innerHtml = `<h1 class="${textAlign} font-extrabold text-slate-900 dark:text-white" style="font-size: ${c.fontSize}px; padding: ${c.paddingY}px ${c.paddingX}px;">${c.text}</h1>`;
+                        break;
+
+                    case 'text':
+                        innerHtml = `
+                            <div class="${textAlign} space-y-1" style="padding: ${c.paddingY}px ${c.paddingX}px;">
+                                <h2 style="font-size: ${c.fontSize}px;" class="font-bold text-slate-800 dark:text-white">${c.text}</h2>
+                                ${c.subtext ? `<p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">${c.subtext}</p>` : ''}
+                            </div>`;
+                        break;
+
+                    case 'badge':
+                        innerHtml = `
+                            <div class="flex ${alignClass}">
+                                <span style="background-color: ${c.color}; color: ${c.textColor}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;" class="font-bold inline-block ${shadowCls}">${c.text}</span>
+                            </div>`;
+                        break;
+
+                    case 'alertBox':
+                        innerHtml = `
+                            <div style="border-right: 4px solid ${c.color}; background-color: ${c.color}15; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="space-y-1">
+                                <div class="font-bold text-sm" style="color: ${c.color}">${c.title}</div>
+                                <p class="text-xs text-slate-600 dark:text-slate-300">${c.text}</p>
+                            </div>`;
+                        break;
+
+                    case 'iconBox':
+                        innerHtml = `
+                            <div class="flex ${alignClass}">
+                                <div style="background-color: ${c.color}15; color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="inline-flex flex-col items-center gap-2 border border-current/20">
+                                    <i data-lucide="${c.iconName}" style="width: ${c.fontSize}px; height: ${c.fontSize}px;"></i>
+                                    ${c.caption ? `<span class="text-xs font-bold">${c.caption}</span>` : ''}
+                                </div>
+                            </div>`;
+                        break;
+
+                    case 'divider':
+                        innerHtml = `<hr style="border-color: ${c.color}; margin: ${c.paddingY}px 0;" class="border-t-2 opacity-60">`;
+                        break;
+
+                    case 'spacer':
+                        innerHtml = `<div style="height: ${c.spaceHeight}px;" class="w-full border border-dashed border-slate-300/40 dark:border-slate-700/40 rounded-lg flex items-center justify-center text-[10px] text-slate-400">${isPreviewMode ? '' : `مسافة فارغة (${c.spaceHeight}px)`}</div>`;
+                        break;
+
+                    case 'button':
+                    case 'fabBtn':
+                        const btnWidthClass = c.widthMode === 'full' ? 'w-full' : '';
+                        innerHtml = `
+                            <div class="flex ${alignClass}">
+                                <button type="button" onclick="executeComponentAction(event, '${c.id}')" 
+                                    style="background-color: ${c.color}; color: ${c.textColor}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px; ${c.widthMode === 'custom' ? `width: ${c.customWidth}px;` : ''}" 
+                                    class="${btnWidthClass} ${shadowCls} font-bold transition transform active:scale-95 flex items-center justify-center gap-2">
+                                    <span>${c.text}</span>
+                                    ${c.actionType && c.actionType !== 'none' ? `<span class="text-[10px] opacity-80 px-1.5 py-0.5 rounded bg-black/20">${c.actionType === 'navigate_page' ? 'صفحة' : (c.actionType === 'python_api' ? 'Python' : '⚡')}</span>` : ''}
+                                </button>
+                            </div>`;
+                        break;
+
+                    case 'gradientBtn':
+                        innerHtml = `
+                            <div class="flex ${alignClass}">
+                                <button type="button" onclick="executeComponentAction(event, '${c.id}')" 
+                                    style="background: linear-gradient(135deg, ${c.color}, ${c.color2}); color: ${c.textColor}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;" 
+                                    class="${c.widthMode === 'full' ? 'w-full' : ''} ${shadowCls} font-extrabold transition transform hover:scale-[1.02] active:scale-95">
+                                    ${c.text}
+                                </button>
+                            </div>`;
+                        break;
+
+                    case 'btnGroup':
+                        innerHtml = `
+                            <div class="flex ${alignClass} gap-2.5 flex-wrap">
+                                <button type="button" onclick="executeComponentAction(event, '${c.id}')" style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white text-xs font-bold ${shadowCls}">${c.btn1Text}</button>
+                                <button type="button" onclick="showToast('تم النقر على: ${c.btn2Text}')" style="background-color: ${c.color2}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white text-xs font-bold ${shadowCls}">${c.btn2Text}</button>
+                            </div>`;
+                        break;
+
+                    case 'scrollTop':
+                        innerHtml = `
+                            <button type="button" onclick="executeComponentAction(event, '${c.id}')" style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white text-xs font-bold ${shadowCls} flex items-center gap-1.5">
+                                <span>${c.text}</span>
+                            </button>`;
+                        break;
+
+                    case 'input':
+                        innerHtml = `
+                            <div class="space-y-1.5" style="${widthStyle}">
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">${c.fieldLabel} ${c.required ? '<span class="text-rose-500">*</span>' : ''}</label>
+                                <input type="${c.inputType}" data-field-name="${c.elementName}" placeholder="${c.placeholder}" 
+                                    style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;"
+                                    class="w-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 focus:outline-none focus:border-indigo-500">
+                            </div>`;
+                        break;
+
+                    case 'textarea':
+                        innerHtml = `
+                            <div class="space-y-1.5" style="${widthStyle}">
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">${c.fieldLabel}</label>
+                                <textarea rows="${c.rows}" data-field-name="${c.elementName}" placeholder="${c.placeholder}"
+                                    style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;"
+                                    class="w-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 focus:outline-none focus:border-indigo-500"></textarea>
+                            </div>`;
+                        break;
+
+                    case 'select':
+                        const opts = c.options.split(',').map(o => `<option value="${o.trim()}">${o.trim()}</option>`).join('');
+                        innerHtml = `
+                            <div class="space-y-1.5" style="${widthStyle}">
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">${c.fieldLabel}</label>
+                                <select data-field-name="${c.elementName}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;"
+                                    class="w-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 focus:outline-none focus:border-indigo-500">
+                                    ${opts}
+                                </select>
+                            </div>`;
+                        break;
+
+                    case 'checkbox':
+                        innerHtml = `
+                            <label class="flex items-center gap-2.5 cursor-pointer" style="padding: ${c.paddingY}px ${c.paddingX}px;">
+                                <input type="checkbox" data-field-name="${c.elementName}" ${c.checked ? 'checked' : ''} style="accent-color: ${c.color}" class="w-4 h-4 rounded">
+                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">${c.text}</span>
+                            </label>`;
+                        break;
+
+                    case 'toggle':
+                        innerHtml = `
+                            <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700/70 bg-slate-50/60 dark:bg-slate-800/40 cursor-pointer">
+                                <span class="text-xs font-bold">${c.text}</span>
+                                <input type="checkbox" data-field-name="${c.elementName}" ${c.checked ? 'checked' : ''} style="accent-color: ${c.color}" class="w-5 h-5">
+                            </label>`;
+                        break;
+
+                    case 'slider':
+                        innerHtml = `
+                            <div class="space-y-1.5" style="padding: ${c.paddingY}px ${c.paddingX}px;">
+                                <div class="flex justify-between text-xs font-bold">
+                                    <span>${c.fieldLabel}</span>
+                                    <span style="color: ${c.color}" class="font-mono">${c.defaultVal}</span>
+                                </div>
+                                <input type="range" data-field-name="${c.elementName}" min="${c.minVal}" max="${c.maxVal}" value="${c.defaultVal}" style="accent-color: ${c.color}" class="w-full cursor-pointer">
+                            </div>`;
+                        break;
+
+                    case 'datePicker':
+                        innerHtml = `
+                            <div class="space-y-1.5" style="${widthStyle}">
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">${c.fieldLabel}</label>
+                                <input type="${c.pickerMode}" data-field-name="${c.elementName}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="w-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-xs">
+                            </div>`;
+                        break;
+
+                    case 'fileUpload':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30 text-center space-y-1.5">
+                                <i data-lucide="upload-cloud" class="w-7 h-7 mx-auto text-indigo-500"></i>
+                                <div class="text-xs font-bold">${c.fieldLabel}</div>
+                                <div class="text-[11px] text-slate-400">${c.acceptTypes}</div>
+                            </div>`;
+                        break;
+
+                    case 'searchBar':
+                        innerHtml = `
+                            <div class="flex items-center gap-2" style="${widthStyle}">
+                                <input type="search" placeholder="${c.placeholder}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="flex-1 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs">
+                                <button type="button" onclick="showToast('جاري البحث...')" style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px 18px;" class="text-white text-xs font-bold">${c.buttonText}</button>
+                            </div>`;
+                        break;
+
+                    case 'card':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${widthStyle}" class="border border-slate-200 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/40 ${shadowCls} space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="font-bold text-base text-slate-800 dark:text-white">${c.title}</h3>
+                                    <span style="background-color: ${c.color}20; color: ${c.color}" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full">بطاقة</span>
+                                </div>
+                                <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">${c.body}</p>
+                                <button type="button" onclick="executeComponentAction(event, '${c.id}')" style="background-color: ${c.color}; border-radius: ${Math.max(6, c.borderRadius - 4)}px;" class="px-4 py-2 text-white text-xs font-bold shadow-sm">
+                                    ${c.buttonText}
+                                </button>
+                            </div>`;
+                        break;
+
+                    case 'statCard':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 ${shadowCls} flex items-center justify-between">
+                                <div class="space-y-1">
+                                    <div class="text-xs text-slate-400 font-semibold">${c.title}</div>
+                                    <div class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">${c.value}</div>
+                                    <div style="color: ${c.color}" class="text-[11px] font-bold">${c.trend}</div>
+                                </div>
+                                <div style="background-color: ${c.color}15; color: ${c.color}" class="w-12 h-12 rounded-2xl flex items-center justify-center">
+                                    <i data-lucide="trending-up" class="w-6 h-6"></i>
+                                </div>
+                            </div>`;
+                        break;
+
+                    case 'progress':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="border border-slate-200 dark:border-slate-700/70 bg-slate-50/50 dark:bg-slate-800/30 space-y-2">
+                                <div class="flex justify-between text-xs font-bold">
+                                    <span>${c.title}</span>
+                                    <span style="color: ${c.color}" class="font-mono">${c.percent}%</span>
+                                </div>
+                                <div class="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div style="width: ${c.percent}%; background-color: ${c.color}" class="h-full rounded-full transition-all duration-300"></div>
+                                </div>
+                            </div>`;
+                        break;
+
+                    case 'table':
+                        const ths = c.headers.split(',').map(h => `<th class="px-3 py-2 text-right font-bold">${h.trim()}</th>`).join('');
+                        const trs = c.rowsData.split('\n').filter(Boolean).map(row => {
+                            const tds = row.split('|').map(cell => `<td class="px-3 py-2 border-t border-slate-200 dark:border-slate-700/70">${cell.trim()}</td>`).join('');
+                            return `<tr>${tds}</tr>`;
+                        }).join('');
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px;" class="overflow-x-auto border border-slate-200 dark:border-slate-700 ${shadowCls}">
+                                <table class="w-full text-xs">
+                                    <thead style="background-color: ${c.color};" class="text-white">
+                                        <tr>${ths}</tr>
+                                    </thead>
+                                    <tbody class="bg-white dark:bg-slate-800/50">${trs}</tbody>
+                                </table>
+                            </div>`;
+                        break;
+
+                    case 'video':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px;" class="relative h-48 bg-slate-900 text-white flex flex-col items-center justify-center gap-2 overflow-hidden ${shadowCls}">
+                                <div style="background-color: ${c.color}" class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg">
+                                    <i data-lucide="play" class="w-6 h-6 fill-current"></i>
+                                </div>
+                                <span class="text-xs font-bold">${c.title}</span>
+                                <span class="text-[10px] font-mono opacity-70">${c.duration}</span>
+                            </div>`;
+                        break;
+
+                    case 'accordion':
+                        innerHtml = `
+                            <details open style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40">
+                                <summary class="font-bold text-xs cursor-pointer text-indigo-500">${c.question}</summary>
+                                <p class="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">${c.answer}</p>
+                            </details>`;
+                        break;
+
+                    case 'modalBox':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="border-2 border-indigo-500/30 bg-white dark:bg-slate-800 ${shadowCls} space-y-3">
+                                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                                    <span class="font-bold text-sm">${c.title}</span>
+                                    <span class="text-xs text-slate-400">✕</span>
+                                </div>
+                                <p class="text-xs text-slate-600 dark:text-slate-300">${c.body}</p>
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" onclick="showToast('تم التأكيد')" style="background-color: ${c.color}" class="px-4 py-1.5 rounded-lg text-white text-xs font-bold">${c.confirmText}</button>
+                                </div>
+                            </div>`;
+                        break;
+
+                    case 'navbar':
+                        const navLinksHtml = c.syncWithPages
+                            ? pages.map(p => `<button type="button" onclick="if(isPreviewMode) switchPage('${p.id}')" class="hover:underline ${p.id === activePageId ? 'underline font-extrabold' : 'opacity-85'}">${p.name}</button>`).join('')
+                            : c.links.split(',').map(l => `<span>${l.trim()}</span>`).join('');
+                        innerHtml = `
+                            <nav style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white flex items-center justify-between ${shadowCls}">
+                                <span class="font-extrabold text-sm">${c.brand}</span>
+                                <div class="flex items-center gap-4 text-xs font-medium flex-wrap">
+                                    ${navLinksHtml}
+                                </div>
+                            </nav>`;
+                        break;
+
+                    case 'bottomNav':
+                        const bottomItemsHtml = c.syncWithPages
+                            ? pages.map(p => `<button type="button" onclick="if(isPreviewMode) switchPage('${p.id}')" class="flex flex-col items-center gap-0.5 text-[11px] font-bold ${p.id === activePageId ? 'text-white scale-105' : 'text-white/70'}"><span>●</span><span>${p.name}</span></button>`).join('')
+                            : c.items.split(',').map(i => `<span class="text-xs font-bold">${i.trim()}</span>`).join('');
+                        innerHtml = `
+                            <div style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white flex items-center justify-around ${shadowCls}">
+                                ${bottomItemsHtml}
+                            </div>`;
+                        break;
+
+                    case 'rowCards':
+                        innerHtml = `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div style="border-radius: ${c.borderRadius}px;" class="p-4 border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 space-y-1.5">
+                                    <h4 style="color: ${c.color}" class="font-bold text-sm">${c.card1Title}</h4>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">${c.card1Desc}</p>
+                                </div>
+                                <div style="border-radius: ${c.borderRadius}px;" class="p-4 border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 space-y-1.5">
+                                    <h4 style="color: ${c.color}" class="font-bold text-sm">${c.card2Title}</h4>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">${c.card2Desc}</p>
+                                </div>
+                            </div>`;
+                        break;
+
+                    case 'footer':
+                        innerHtml = `
+                            <footer style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;" class="text-white/90 text-center font-medium">
+                                ${c.text}
+                            </footer>`;
+                        break;
+
+                    case 'image':
+                        innerHtml = `
+                            <figure class="space-y-1.5" style="${widthStyle}">
+                                <img src="${c.url}" onerror="this.src='https://placehold.co/800x300/334155/ffffff?text=صورة+التطبيق'" alt="${c.caption}" style="border-radius: ${c.borderRadius}px;" class="w-full h-48 object-cover border border-slate-200 dark:border-slate-700 ${shadowCls}">
+                                ${c.caption ? `<figcaption class="text-xs text-center text-slate-500">${c.caption}</figcaption>` : ''}
+                            </figure>`;
+                        break;
+
+                    case 'form':
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px;" class="p-5 border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30 ${shadowCls} space-y-3">
+                                <h3 class="font-bold text-sm text-slate-800 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">${c.formTitle}</h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <input type="text" placeholder="الاسم الكامل" class="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs">
+                                    <input type="email" placeholder="البريد الإلكتروني" class="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs">
+                                </div>
+                                <textarea rows="2" placeholder="رسالتك أو ملاحظاتك..." class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"></textarea>
+                                <button type="button" onclick="showToast('تم إرسال بيانات النموذج إلى خادم Python (${c.apiEndpoint})')" style="background-color: ${c.color}" class="w-full py-2.5 rounded-xl text-white text-xs font-bold shadow">
+                                    ${c.submitText}
+                                </button>
+                            </div>`;
+                        break;
+
+                    case 'list':
+                        const itemsArr = c.items.split(',').map(i => i.trim()).filter(Boolean);
+                        innerHtml = `
+                            <div style="border-radius: ${c.borderRadius}px;" class="p-4 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40 ${shadowCls} space-y-2.5">
+                                <h4 class="font-bold text-sm text-slate-800 dark:text-white">${c.listTitle}</h4>
+                                <ul class="space-y-1.5">
+                                    ${itemsArr.map(item => `
+                                        <li class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/80">
+                                            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                            <span>${item}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>`;
+                        break;
+                }
+
+                return `
+                    <div id="dom_${c.id}" 
+                         onmousedown="startFreeDrag(event, '${c.id}')"
+                         onclick="selectComponent(event, '${c.id}')" 
+                         style="${wrapperStyle}"
+                         class="widget-wrapper ${wrapperPosClass} group rounded-xl p-1.5 cursor-pointer ${isSelected ? 'widget-selected' : ''}">
+                        <div class="widget-controls ${isSelected ? 'flex' : 'hidden group-hover:flex'} items-center gap-1 absolute -top-3.5 left-2 bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-md z-20 text-[10px] whitespace-nowrap">
+                            <span class="font-bold text-indigo-400 ml-1">${c.label}</span>
+                            ${c.posMode === 'free' ? `<span class="text-amber-400 font-mono mx-1">${c.posX},${c.posY}</span>` : ''}
+                            ${c.posMode === 'flow' ? `
+                                <button type="button" data-control="1" onclick="moveComponent(event, '${c.id}', -1)" class="p-0.5 hover:text-indigo-300" title="تحريك لأعلى">↑</button>
+                                <button type="button" data-control="1" onclick="moveComponent(event, '${c.id}', 1)" class="p-0.5 hover:text-indigo-300" title="تحريك لأسفل">↓</button>
+                            ` : ''}
+                            <button type="button" data-control="1" onclick="deleteComponent(event, '${c.id}')" class="p-0.5 text-rose-400 hover:text-rose-300 mr-1" title="حذف العنصر">✕</button>
+                        </div>
+                        ${innerHtml}
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // 5. لوحة الخصائص الشاملة لجميع الأدوات والصفحات
+        // ==========================================
+        function renderInspector() {
+            const panel = document.getElementById('inspectorContent');
+            const comps = getComponents();
+            const comp = comps.find(c => c.id === selectedId);
+
+            if (!comp) {
+                panel.innerHTML = `
+                    <div class="my-auto text-center text-slate-400 py-8 px-2">
+                        <i data-lucide="mouse-pointer" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+                        <p class="text-xs leading-relaxed">انقر على أي أداة داخل الصفحة لتخصيص شكلها، موضعها (X/Y)، أو ربطها للانتقال إلى صفحة أخرى.</p>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            const hasActionSupport = ['button', 'gradientBtn', 'fabBtn', 'btnGroup', 'card', 'scrollTop'].includes(comp.type);
+            if (inspectorTab === 'action' && !hasActionSupport) inspectorTab = 'style';
+
+            let html = `
+                <div class="mb-3 pb-2.5 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-extrabold text-indigo-500 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            ${comp.label}
+                        </span>
+                        <button onclick="deleteComponent(event, '${comp.id}')" class="text-[11px] text-rose-500 hover:underline font-semibold">حذف</button>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+                        <span>المعرف:</span>
+                        <input type="text" value="${comp.elementName}" oninput="updateProp('elementName', this.value)" dir="ltr" class="flex-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-[11px] border border-slate-200 dark:border-slate-700">
+                    </div>
+                </div>
+
+                <div class="grid ${hasActionSupport ? 'grid-cols-3' : 'grid-cols-2'} gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl mb-4 text-[11px] font-bold">
+                    <button onclick="switchInspectorTab('style')" class="py-1.5 rounded-lg transition ${inspectorTab === 'style' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}">المظهر</button>
+                    <button onclick="switchInspectorTab('position')" class="py-1.5 rounded-lg transition ${inspectorTab === 'position' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}">الموضع</button>
+                    ${hasActionSupport ? `<button onclick="switchInspectorTab('action')" class="py-1.5 rounded-lg transition ${inspectorTab === 'action' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-500 dark:text-indigo-400'}">⚡ الوظيفة</button>` : ''}
+                </div>
+
+                <div class="space-y-3.5 text-xs">
+            `;
+
+            if (inspectorTab === 'style') {
+                // حقول ديناميكية حسب نوع الأداة
+                if ('text' in comp) {
+                    html += `<div><label class="block font-bold mb-1">النص الأساسي</label><input type="text" value="${comp.text}" oninput="updateProp('text', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('subtext' in comp) {
+                    html += `<div><label class="block font-bold mb-1">النص الفرعي</label><textarea rows="2" oninput="updateProp('subtext', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">${comp.subtext}</textarea></div>`;
+                }
+                if ('title' in comp) {
+                    html += `<div><label class="block font-bold mb-1">العنوان</label><input type="text" value="${comp.title}" oninput="updateProp('title', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('body' in comp) {
+                    html += `<div><label class="block font-bold mb-1">المحتوى</label><textarea rows="2" oninput="updateProp('body', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">${comp.body}</textarea></div>`;
+                }
+                if ('fieldLabel' in comp) {
+                    html += `<div><label class="block font-bold mb-1">عنوان الحقل</label><input type="text" value="${comp.fieldLabel}" oninput="updateProp('fieldLabel', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('placeholder' in comp) {
+                    html += `<div><label class="block font-bold mb-1">النص التوضيحي</label><input type="text" value="${comp.placeholder}" oninput="updateProp('placeholder', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('options' in comp) {
+                    html += `<div><label class="block font-bold mb-1">الخيارات (مفصولة بفاصلة)</label><input type="text" value="${comp.options}" oninput="updateProp('options', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('percent' in comp) {
+                    html += `<div><label class="block font-bold mb-1">نسبة التقدم (${comp.percent}%)</label><input type="range" min="0" max="100" value="${comp.percent}" oninput="updateProp('percent', Number(this.value), true)" class="w-full accent-indigo-600"></div>`;
+                }
+                if ('value' in comp && 'trend' in comp) {
+                    html += `
+                        <div><label class="block font-bold mb-1">القيمة الإحصائية</label><input type="text" value="${comp.value}" oninput="updateProp('value', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
+                        <div><label class="block font-bold mb-1">مؤشر النمو</label><input type="text" value="${comp.trend}" oninput="updateProp('trend', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('headers' in comp) {
+                    html += `
+                        <div><label class="block font-bold mb-1">أعمدة الجدول (مفصولة بفاصلة)</label><input type="text" value="${comp.headers}" oninput="updateProp('headers', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
+                        <div><label class="block font-bold mb-1">صفوف البيانات (افصل الأعمدة بـ |)</label><textarea rows="3" oninput="updateProp('rowsData', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">${comp.rowsData}</textarea></div>`;
+                }
+                if ('syncWithPages' in comp) {
+                    html += `
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 cursor-pointer font-bold text-indigo-500">
+                            <input type="checkbox" ${comp.syncWithPages ? 'checked' : ''} onchange="updateProp('syncWithPages', this.checked, true)" class="accent-indigo-600 w-4 h-4">
+                            <span>ربط الروابط تلقائياً بصفحات المشروع</span>
+                        </label>`;
+                }
+                if ('brand' in comp) {
+                    html += `<div><label class="block font-bold mb-1">اسم التطبيق</label><input type="text" value="${comp.brand}" oninput="updateProp('brand', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('url' in comp) {
+                    html += `<div><label class="block font-bold mb-1">رابط الصورة</label><input type="text" value="${comp.url}" oninput="updateProp('url', this.value)" dir="ltr" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                }
+                if ('spaceHeight' in comp) {
+                    html += `<div><label class="block font-bold mb-1">ارتفاع المسافة (${comp.spaceHeight}px)</label><input type="range" min="8" max="200" value="${comp.spaceHeight}" oninput="updateProp('spaceHeight', Number(this.value), true)" class="w-full accent-indigo-600"></div>`;
+                }
+                if ('color' in comp) {
+                    html += `
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="block font-bold mb-1">اللون الأساسي</label><input type="color" value="${comp.color}" oninput="updateProp('color', this.value)" class="w-full h-9 rounded-lg cursor-pointer"></div>
+                            ${'color2' in comp ? `<div><label class="block font-bold mb-1">اللون الثانوي</label><input type="color" value="${comp.color2}" oninput="updateProp('color2', this.value)" class="w-full h-9 rounded-lg cursor-pointer"></div>` : ''}
+                            ${'textColor' in comp ? `<div><label class="block font-bold mb-1">لون النص</label><input type="color" value="${comp.textColor}" oninput="updateProp('textColor', this.value)" class="w-full h-9 rounded-lg cursor-pointer"></div>` : ''}
+                        </div>`;
+                }
+
+                html += `
+                    <div class="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                        <div>
+                            <div class="flex justify-between mb-1"><label class="font-bold">حجم الخط / الأيقونة</label><span class="font-mono text-indigo-500">${comp.fontSize}px</span></div>
+                            <input type="range" min="11" max="48" value="${comp.fontSize}" oninput="updateProp('fontSize', Number(this.value), true)" class="w-full accent-indigo-600">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><label class="font-bold">استدارة الحواف</label><span class="font-mono text-indigo-500">${comp.borderRadius}px</span></div>
+                            <input type="range" min="0" max="50" value="${comp.borderRadius}" oninput="updateProp('borderRadius', Number(this.value), true)" class="w-full accent-indigo-600">
+                        </div>
+                    </div>`;
+            } else if (inspectorTab === 'position') {
+                html += `
+                    <div>
+                        <label class="block font-bold mb-1.5">نظام التموضع</label>
+                        <select onchange="updateProp('posMode', this.value, true)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold">
+                            <option value="flow" ${comp.posMode === 'flow' ? 'selected' : ''}>تدفق تلقائي (متجاوب)</option>
+                            <option value="free" ${comp.posMode === 'free' ? 'selected' : ''}>تحريك حر بالإحداثيات (X / Y)</option>
+                            <option value="fixed" ${comp.posMode === 'fixed' ? 'selected' : ''}>تثبيت عائم في الزاوية (Fixed)</option>
+                        </select>
+                    </div>
+                `;
+                if (comp.posMode === 'free') {
+                    html += `
+                        <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 grid grid-cols-2 gap-2">
+                            <div><label class="block font-bold mb-1">X (px)</label><input id="propPosX" type="number" value="${comp.posX}" oninput="updateProp('posX', Number(this.value))" class="w-full px-2 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"></div>
+                            <div><label class="block font-bold mb-1">Y (px)</label><input id="propPosY" type="number" value="${comp.posY}" oninput="updateProp('posY', Number(this.value))" class="w-full px-2 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"></div>
+                        </div>`;
+                } else if (comp.posMode === 'fixed') {
+                    html += `
+                        <div>
+                            <label class="block font-bold mb-1">زاوية التثبيت</label>
+                            <select onchange="updateProp('fixedCorner', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                <option value="bottom-left" ${comp.fixedCorner === 'bottom-left' ? 'selected' : ''}>أسفل اليسار</option>
+                                <option value="bottom-right" ${comp.fixedCorner === 'bottom-right' ? 'selected' : ''}>أسفل اليمين</option>
+                                <option value="top-left" ${comp.fixedCorner === 'top-left' ? 'selected' : ''}>أعلى اليسار</option>
+                                <option value="top-right" ${comp.fixedCorner === 'top-right' ? 'selected' : ''}>أعلى اليمين</option>
+                            </select>
+                        </div>`;
+                } else {
+                    html += `
+                        <div>
+                            <label class="block font-bold mb-1">المحاذاة</label>
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <button type="button" onclick="updateProp('align', 'right', true)" class="py-1.5 rounded-lg border ${comp.align === 'right' ? 'border-indigo-500 bg-indigo-500/10 text-indigo-500 font-bold' : 'border-slate-300 dark:border-slate-700'}">يمين</button>
+                                <button type="button" onclick="updateProp('align', 'center', true)" class="py-1.5 rounded-lg border ${comp.align === 'center' ? 'border-indigo-500 bg-indigo-500/10 text-indigo-500 font-bold' : 'border-slate-300 dark:border-slate-700'}">وسط</button>
+                                <button type="button" onclick="updateProp('align', 'left', true)" class="py-1.5 rounded-lg border ${comp.align === 'left' ? 'border-indigo-500 bg-indigo-500/10 text-indigo-500 font-bold' : 'border-slate-300 dark:border-slate-700'}">يسار</button>
+                            </div>
+                        </div>`;
+                }
+                html += `
+                    <div>
+                        <label class="block font-bold mb-1">العرض</label>
+                        <select onchange="updateProp('widthMode', this.value, true)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                            <option value="auto" ${comp.widthMode === 'auto' ? 'selected' : ''}>تلقائي</option>
+                            <option value="full" ${comp.widthMode === 'full' ? 'selected' : ''}>عرض كامل (100%)</option>
+                            <option value="custom" ${comp.widthMode === 'custom' ? 'selected' : ''}>مخصص (px)</option>
+                        </select>
+                    </div>
+                    ${comp.widthMode === 'custom' ? `<div><label class="block font-bold mb-1">العرض (px)</label><input type="number" value="${comp.customWidth}" oninput="updateProp('customWidth', Number(this.value))" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"></div>` : ''}
+                `;
+            } else if (inspectorTab === 'action') {
+                const otherElements = comps.filter(item => item.id !== comp.id);
+                const otherOptions = otherElements.map(el => `<option value="${el.id}" ${comp.targetElementId === el.id ? 'selected' : ''}>${el.label} (${el.elementName})</option>`).join('');
+                const pageOptions = pages.map(p => `<option value="${p.id}" ${comp.actionPageId === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+
+                html += `
+                    <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                        <label class="block font-extrabold text-indigo-500 mb-1.5">اختر وظيفة الزر عند النقر:</label>
+                        <select onchange="updateProp('actionType', this.value, true)" class="w-full px-3 py-2.5 rounded-lg border border-indigo-500/40 bg-white dark:bg-slate-900 font-bold text-xs">
+                            ${Object.entries(actionLabels).map(([val, text]) => `<option value="${val}" ${comp.actionType === val ? 'selected' : ''}>${text}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+
+                if (comp.actionType === 'navigate_page') {
+                    html += `
+                        <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 space-y-2">
+                            <label class="block font-bold text-sky-500">اختر الصفحة المستهدفة:</label>
+                            <select onchange="updateProp('actionPageId', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold">
+                                <option value="">-- اختر صفحة للانتقال إليها --</option>
+                                ${pageOptions}
+                            </select>
+                        </div>`;
+                } else if (comp.actionType === 'toast') {
+                    html += `<div><label class="block font-bold mb-1">نص التنبيه</label><input type="text" value="${comp.actionMsg}" oninput="updateProp('actionMsg', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                } else if (comp.actionType === 'url') {
+                    html += `<div><label class="block font-bold mb-1">الرابط (URL)</label><input type="url" value="${comp.actionUrl}" oninput="updateProp('actionUrl', this.value)" dir="ltr" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"></div>`;
+                } else if (comp.actionType === 'python_api') {
+                    html += `<div><label class="block font-bold mb-1">مسار API في Python</label><input type="text" value="${comp.apiEndpoint}" oninput="updateProp('apiEndpoint', this.value)" dir="ltr" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"></div>`;
+                } else if (comp.actionType === 'toggle_el') {
+                    html += `<div><label class="block font-bold mb-1">العنصر المستهدف</label><select onchange="updateProp('targetElementId', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"><option value="">-- اختر عنصراً --</option>${otherOptions}</select></div>`;
+                } else if (comp.actionType === 'update_text') {
+                    html += `
+                        <div><label class="block font-bold mb-1">العنصر المستهدف</label><select onchange="updateProp('targetElementId', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"><option value="">-- اختر عنصراً --</option>${otherOptions}</select></div>
+                        <div><label class="block font-bold mb-1">النص الجديد</label><input type="text" value="${comp.newTargetText}" oninput="updateProp('newTargetText', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>`;
+                } else if (comp.actionType === 'counter') {
+                    html += `
+                        <div><label class="block font-bold mb-1">العنصر المستهدف (أو الزر نفسه)</label><select onchange="updateProp('targetElementId', this.value)" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"><option value="">الزر نفسه</option>${otherOptions}</select></div>
+                        <div><label class="block font-bold mb-1">مقدار الزيادة / النقصان</label><input type="number" value="${comp.counterStep}" oninput="updateProp('counterStep', Number(this.value))" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"></div>`;
+                } else if (comp.actionType === 'custom_js') {
+                    html += `<div><label class="block font-bold mb-1">كود JS</label><textarea rows="3" oninput="updateProp('customJsCode', this.value)" dir="ltr" class="w-full px-3 py-2 rounded-lg bg-slate-900 text-emerald-400 font-mono text-xs">${comp.customJsCode}</textarea></div>`;
+                }
+
+                html += `<button type="button" onclick="togglePreviewMode()" class="w-full py-2 rounded-xl bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold text-xs hover:bg-emerald-600/25 transition">▶ تجربة الوظيفة في المعاينة الحية</button>`;
+            }
+
+            html += `</div>`;
+            panel.innerHTML = html;
+        }
+
+        // ==========================================
+        // 6. محرك توليد الأكواد المتعددة الصفحات (Multi-Page HTML SPA + Python Flask)
+        // ==========================================
+        function getActionJsCallForPage(c, pageComponents) {
+            const act = c.actionType || 'none';
+            if (act === 'none') return '';
+            if (act === 'navigate_page' && c.actionPageId) {
+                return `navigateToPage('${c.actionPageId}')`;
+            }
+            if (act === 'toast') return `showNotification('${(c.actionMsg || '').replace(/'/g, "\\'")}')`;
+            if (act === 'url') {
+                return c.actionNewTab ? `window.open('${c.actionUrl}', '_blank')` : `window.location.href = '${c.actionUrl}'`;
+            }
+            if (act === 'python_api') return `sendDataToPython('${c.apiEndpoint || '/api/submit'}')`;
+            if (act === 'toggle_el' && c.targetElementId) {
+                const target = pageComponents.find(item => item.id === c.targetElementId);
+                return target ? `toggleElementVisibility('${target.elementName}')` : '';
+            }
+            if (act === 'update_text' && c.targetElementId) {
+                const target = pageComponents.find(item => item.id === c.targetElementId);
+                return target ? `updateElementText('${target.elementName}', '${(c.newTargetText || '').replace(/'/g, "\\'")}')` : '';
+            }
+            if (act === 'counter') {
+                const target = c.targetElementId ? pageComponents.find(item => item.id === c.targetElementId) : c;
+                return target ? `incrementCounter('${target.elementName}', ${Number(c.counterStep) || 1})` : '';
+            }
+            if (act === 'scroll_top') return `window.scrollTo({top: 0, behavior: 'smooth'})`;
+            if (act === 'custom_js') return (c.customJsCode || '').replace(/"/g, '&quot;');
+            return '';
+        }
+
+        function renderComponentToHtml(c, pageComponents) {
+            let posStyle = `margin-top: ${c.marginY || 0}px; margin-bottom: ${c.marginY || 0}px;`;
+            let posClass = '';
+            if (c.posMode === 'free') {
+                posClass = 'absolute z-20';
+                posStyle = `left: ${c.posX}px; top: ${c.posY}px;`;
+            } else if (c.posMode === 'fixed') {
+                posClass = 'fixed z-40';
+                const cornerMap = {
+                    'bottom-left': 'bottom: 24px; left: 24px;',
+                    'bottom-right': 'bottom: 24px; right: 24px;',
+                    'top-left': 'top: 24px; left: 24px;',
+                    'top-right': 'top: 24px; right: 24px;'
+                };
+                posStyle = cornerMap[c.fixedCorner] || cornerMap['bottom-left'];
+            }
+
+            const widthStyle = c.widthMode === 'full' ? 'width: 100%;' : (c.widthMode === 'custom' ? `width: ${c.customWidth}px;` : '');
+            const shadowCls = getShadowClass(c.shadow);
+            const onclickAttr = getActionJsCallForPage(c, pageComponents) ? `onclick="${getActionJsCallForPage(c, pageComponents)}"` : '';
+            const align = c.align === 'center' ? 'text-center' : (c.align === 'left' ? 'text-left' : 'text-right');
+            const flexAlign = c.align === 'center' ? 'justify-center' : (c.align === 'left' ? 'justify-end' : 'justify-start');
+
+            switch (c.type) {
+                case 'heading':
+                    return `<h1 id="${c.elementName}" style="font-size: ${c.fontSize}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} ${align} font-extrabold">${c.text}</h1>`;
+                case 'text':
+                    return `<div id="${c.elementName}" style="padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} ${align}"><h2 style="font-size: ${c.fontSize}px;" class="font-bold mb-1">${c.text}</h2><p class="text-slate-600 dark:text-slate-300">${c.subtext || ''}</p></div>`;
+                case 'badge':
+                    return `<div style="${posStyle}" class="${posClass} flex ${flexAlign}"><span style="background-color: ${c.color}; color: ${c.textColor}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;" class="font-bold ${shadowCls}">${c.text}</span></div>`;
+                case 'alertBox':
+                    return `<div style="border-right: 4px solid ${c.color}; background-color: ${c.color}15; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass}"><strong style="color: ${c.color}">${c.title}</strong><p class="text-sm mt-1">${c.text}</p></div>`;
+                case 'divider':
+                    return `<hr style="border-color: ${c.color}; ${posStyle}" class="border-t-2 my-3">`;
+                case 'spacer':
+                    return `<div style="height: ${c.spaceHeight}px;"></div>`;
+                case 'button':
+                case 'fabBtn':
+                    return `<div style="${posStyle}" class="${posClass} flex ${flexAlign}"><button id="${c.elementName}" type="button" ${onclickAttr} style="background-color: ${c.color}; color: ${c.textColor}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;" class="${c.widthMode === 'full' ? 'w-full' : ''} ${shadowCls} font-bold hover:opacity-90 transition">${c.text}</button></div>`;
+                case 'gradientBtn':
+                    return `<div style="${posStyle}" class="${posClass} flex ${flexAlign}"><button id="${c.elementName}" type="button" ${onclickAttr} style="background: linear-gradient(135deg, ${c.color}, ${c.color2}); color: ${c.textColor}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; font-size: ${c.fontSize}px;" class="${c.widthMode === 'full' ? 'w-full' : ''} ${shadowCls} font-extrabold">${c.text}</button></div>`;
+                case 'btnGroup':
+                    return `<div style="${posStyle}" class="${posClass} flex ${flexAlign} gap-3"><button type="button" ${onclickAttr} style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white text-sm font-bold">${c.btn1Text}</button><button type="button" style="background-color: ${c.color2}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="text-white text-sm font-bold">${c.btn2Text}</button></div>`;
+                case 'scrollTop':
+                    return `<button type="button" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} text-white font-bold ${shadowCls}">${c.text}</button>`;
+                case 'input':
+                    return `<div style="${posStyle} ${widthStyle}" class="${posClass}"><label class="block text-sm font-bold mb-1">${c.fieldLabel}</label><input name="${c.elementName}" type="${c.inputType}" placeholder="${c.placeholder}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="w-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></div>`;
+                case 'textarea':
+                    return `<div style="${posStyle} ${widthStyle}" class="${posClass}"><label class="block text-sm font-bold mb-1">${c.fieldLabel}</label><textarea name="${c.elementName}" rows="${c.rows}" placeholder="${c.placeholder}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="w-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea></div>`;
+                case 'select':
+                    const opts = c.options.split(',').map(o => `<option value="${o.trim()}">${o.trim()}</option>`).join('');
+                    return `<div style="${posStyle} ${widthStyle}" class="${posClass}"><label class="block text-sm font-bold mb-1">${c.fieldLabel}</label><select name="${c.elementName}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px;" class="w-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">${opts}</select></div>`;
+                case 'checkbox':
+                    return `<label style="${posStyle}" class="${posClass} flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${c.elementName}" ${c.checked ? 'checked' : ''} class="w-4 h-4"><span>${c.text}</span></label>`;
+                case 'toggle':
+                    return `<label style="${posStyle}" class="${posClass} flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700"><span>${c.text}</span><input type="checkbox" name="${c.elementName}" ${c.checked ? 'checked' : ''}></label>`;
+                case 'slider':
+                    return `<div style="${posStyle}" class="${posClass}"><label class="block text-sm font-bold mb-1">${c.fieldLabel}</label><input type="range" name="${c.elementName}" min="${c.minVal}" max="${c.maxVal}" value="${c.defaultVal}" class="w-full"></div>`;
+                case 'datePicker':
+                    return `<div style="${posStyle}" class="${posClass}"><label class="block text-sm font-bold mb-1">${c.fieldLabel}</label><input type="${c.pickerMode}" name="${c.elementName}" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"></div>`;
+                case 'fileUpload':
+                    return `<div style="border-radius: ${c.borderRadius}px; ${posStyle}" class="${posClass} p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 text-center"><p class="font-bold text-sm">${c.fieldLabel}</p><input type="file" name="${c.elementName}" class="mt-2 text-xs"></div>`;
+                case 'searchBar':
+                    return `<div style="${posStyle}" class="${posClass} flex gap-2"><input type="search" placeholder="${c.placeholder}" class="flex-1 p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"><button type="button" style="background-color: ${c.color}" class="px-5 rounded-xl text-white font-bold text-sm">${c.buttonText}</button></div>`;
+                case 'card':
+                    return `<div id="${c.elementName}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${shadowCls}"><h3 class="text-xl font-bold mb-2">${c.title}</h3><p class="text-sm text-slate-600 dark:text-slate-300 mb-4">${c.body}</p><button type="button" ${onclickAttr} style="background-color: ${c.color}" class="px-5 py-2 rounded-xl text-white text-sm font-bold">${c.buttonText}</button></div>`;
+                case 'statCard':
+                    return `<div style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${shadowCls}"><div class="text-xs text-slate-400">${c.title}</div><div class="text-3xl font-extrabold my-1">${c.value}</div><div style="color: ${c.color}" class="text-xs font-bold">${c.trend}</div></div>`;
+                case 'progress':
+                    return `<div id="${c.elementName}" style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} border border-slate-200 dark:border-slate-700"><div class="flex justify-between text-sm font-bold mb-1"><span>${c.title}</span><span>${c.percent}%</span></div><div class="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden"><div style="width: ${c.percent}%; background-color: ${c.color}" class="h-full"></div></div></div>`;
+                case 'table':
+                    const ths = c.headers.split(',').map(h => `<th class="p-3 text-right">${h.trim()}</th>`).join('');
+                    const trs = c.rowsData.split('\n').filter(Boolean).map(r => `<tr>${r.split('|').map(td => `<td class="p-3 border-t border-slate-200 dark:border-slate-700">${td.trim()}</td>`).join('')}</tr>`).join('');
+                    return `<div style="border-radius: ${c.borderRadius}px; ${posStyle}" class="${posClass} overflow-x-auto border border-slate-200 dark:border-slate-700"><table class="w-full text-sm"><thead style="background-color: ${c.color}" class="text-white"><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+                case 'list':
+                    return `<div style="${posStyle}" class="${posClass}"><h4 class="font-bold text-lg mb-2">${c.listTitle}</h4><ul class="space-y-2">${c.items.split(',').map(i => `<li class="p-3 rounded-xl bg-slate-100 dark:bg-slate-800">${i.trim()}</li>`).join('')}</ul></div>`;
+                case 'accordion':
+                    return `<details open style="border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} border border-slate-200 dark:border-slate-700"><summary class="font-bold cursor-pointer">${c.question}</summary><p class="text-sm mt-2">${c.answer}</p></details>`;
+                case 'navbar':
+                    const navLinks = c.syncWithPages
+                        ? pages.map(p => `<button type="button" onclick="navigateToPage('${p.id}')" class="hover:opacity-80 font-bold">${p.name}</button>`).join('\n            ')
+                        : c.links.split(',').map(l => `<a href="#">${l.trim()}</a>`).join('\n            ');
+                    return `<nav style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} text-white ${shadowCls} flex items-center justify-between mb-4"><span class="font-extrabold text-lg">${c.brand}</span><div class="flex items-center gap-4 text-sm">${navLinks}</div></nav>`;
+                case 'bottomNav':
+                    const bLinks = c.syncWithPages
+                        ? pages.map(p => `<button type="button" onclick="navigateToPage('${p.id}')" class="font-bold text-xs">${p.name}</button>`).join('')
+                        : c.items.split(',').map(i => `<span class="text-xs font-bold">${i.trim()}</span>`).join('');
+                    return `<div style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} text-white flex items-center justify-around ${shadowCls}">${bLinks}</div>`;
+                case 'rowCards':
+                    return `<div style="${posStyle}" class="${posClass} grid grid-cols-1 sm:grid-cols-2 gap-4"><div class="p-4 rounded-xl border border-slate-200 dark:border-slate-700"><h4 style="color: ${c.color}" class="font-bold">${c.card1Title}</h4><p class="text-sm mt-1">${c.card1Desc}</p></div><div class="p-4 rounded-xl border border-slate-200 dark:border-slate-700"><h4 style="color: ${c.color}" class="font-bold">${c.card2Title}</h4><p class="text-sm mt-1">${c.card2Desc}</p></div></div>`;
+                case 'footer':
+                    return `<footer style="background-color: ${c.color}; border-radius: ${c.borderRadius}px; padding: ${c.paddingY}px ${c.paddingX}px; ${posStyle}" class="${posClass} text-white text-center text-xs">${c.text}</footer>`;
+                case 'image':
+                    return `<figure style="${posStyle}" class="${posClass}"><img src="${c.url}" alt="${c.caption}" style="border-radius: ${c.borderRadius}px;" class="w-full max-h-80 object-cover"><figcaption class="text-xs text-center text-slate-500 mt-1">${c.caption}</figcaption></figure>`;
+                case 'form':
+                    return `<form onsubmit="submitFormToPython(event, '${c.apiEndpoint || '/api/submit'}')" style="border-radius: ${c.borderRadius}px; ${posStyle}" class="${posClass} p-6 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-4"><h3 class="text-lg font-bold">${c.formTitle}</h3><input type="text" name="name" required placeholder="الاسم الكامل" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"><input type="email" name="email" required placeholder="البريد الإلكتروني" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"><button type="submit" style="background-color: ${c.color}" class="w-full py-3 rounded-xl text-white font-bold">${c.submitText}</button></form>`;
+                default:
+                    return '';
+            }
+        }
+
+        function buildHtmlCode() {
+            const projectName = document.getElementById('projectNameInput').value || 'تطبيق Flutter Me';
+            const reqDark = document.getElementById('reqDarkMode').checked;
+
+            // شريط تنقل علوي تلقائي إذا كان هناك أكثر من صفحة ولم يضف المستخدم شريط تنقل
+            const autoTopNav = pages.length > 1 ? `
+    <!-- شريط التنقل التلقائي بين صفحات التطبيق -->
+    <div class="max-w-4xl mx-auto mb-6 flex items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <span class="font-extrabold text-indigo-600 dark:text-indigo-400">${projectName}</span>
+        <div class="flex items-center gap-2 flex-wrap">
+            ${pages.map((p, i) => `<button type="button" onclick="navigateToPage('${p.id}')" data-nav-page="${p.id}" class="page-nav-btn px-3 py-1.5 rounded-xl text-xs font-bold transition ${i === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-700'}">${p.name}</button>`).join('\n            ')}
+        </div>
+    </div>` : '';
+
+            // توليد جميع الصفحات كأقسام SPA متكاملة
+            const pagesHtml = pages.map((page, index) => {
+                const hasFree = page.components.some(c => c.posMode === 'free');
+                const inner = page.components.length === 0
+                    ? `<div class="text-center py-16"><h2 class="text-2xl font-bold">${page.name}</h2><p class="text-slate-500 mt-1">صفحة فارغة جاهزة</p></div>`
+                    : page.components.map(c => renderComponentToHtml(c, page.components)).join('\n        ');
+
+                return `
+    <!-- ================= صفحة: ${page.name} ================= -->
+    <section id="${page.id}" class="app-page ${index === 0 ? '' : 'hidden'} space-y-4 ${hasFree ? 'relative min-h-[600px]' : ''}">
+        ${inner}
+    </section>`;
+            }).join('\n');
+
+            return `<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="${reqDark ? 'dark' : ''}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${projectName}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen p-4 sm:p-8">
+${autoTopNav}
+    <main class="max-w-4xl mx-auto">
+${pagesHtml}
+    </main>
+
+    <!-- زر الصعود للأعلى التلقائي -->
+    <button type="button" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-5 left-5 z-40 w-11 h-11 rounded-full bg-indigo-600 text-white shadow-xl flex items-center justify-center font-bold hover:scale-110 transition" title="الصعود للأعلى">↑</button>
+
+    <!-- صندوق الإشعارات -->
+    <div id="toastBox" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900 dark:bg-indigo-600 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-bold"></div>
+
+    <script>
+        // نظام التنقل الفوري بين صفحات التطبيق (Multi-Page SPA Router)
+        function navigateToPage(pageId) {
+            document.querySelectorAll('.app-page').forEach(sec => sec.classList.add('hidden'));
+            const target = document.getElementById(pageId);
+            if (target) {
+                target.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            document.querySelectorAll('.page-nav-btn').forEach(btn => {
+                if (btn.dataset.navPage === pageId) {
+                    btn.className = 'page-nav-btn px-3 py-1.5 rounded-xl text-xs font-bold transition bg-indigo-600 text-white';
+                } else {
+                    btn.className = 'page-nav-btn px-3 py-1.5 rounded-xl text-xs font-bold transition bg-slate-100 dark:bg-slate-700';
+                }
+            });
+        }
+
+        function showNotification(msg) {
+            const box = document.getElementById('toastBox');
+            box.textContent = msg;
+            box.classList.remove('hidden');
+            setTimeout(() => box.classList.add('hidden'), 3000);
+        }
+
+        function toggleElementVisibility(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) el.classList.toggle('hidden');
+        }
+
+        function updateElementText(elementId, newText) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            const heading = el.querySelector('h1, h2, h3');
+            if (heading) heading.textContent = newText;
+            else el.textContent = newText;
+        }
+
+        function incrementCounter(elementId, step) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            const target = el.querySelector('h1, h2, h3') || el;
+            const current = parseInt(target.textContent.replace(/[^\\d-]/g, '')) || 0;
+            target.textContent = current + step;
+        }
+
+        async function sendDataToPython(endpoint) {
+            const inputs = document.querySelectorAll('input, textarea, select');
+            const payload = {};
+            inputs.forEach(inp => {
+                if (inp.name || inp.id) payload[inp.name || inp.id] = inp.type === 'checkbox' ? inp.checked : inp.value;
+            });
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                showNotification(data.message || 'تم الإرسال بنجاح إلى Python!');
+            } catch (err) {
+                showNotification('تأكد من تشغيل خادم Python app.py');
+            }
+        }
+
+        async function submitFormToPython(e, endpoint) {
+            e.preventDefault();
+            const payload = Object.fromEntries(new FormData(e.target).entries());
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                showNotification(data.message || 'تم حفظ النموذج بنجاح!');
+                e.target.reset();
+            } catch (err) {
+                showNotification('تأكد من تشغيل خادم Python app.py');
+            }
+        }
+    <\/script>
+</body>
+</html>`;
+        }
+
+        function buildPythonCode() {
+            const projectName = document.getElementById('projectNameInput').value || 'flutter_me_app';
+            const reqDb = document.getElementById('reqDatabase').checked;
+
+            // جمع جميع مسارات API من كافة الصفحات
+            const allComps = pages.flatMap(p => p.components);
+            const customEndpoints = [...new Set(
+                allComps
+                    .filter(c => (c.actionType === 'python_api' || c.type === 'form') && c.apiEndpoint && c.apiEndpoint !== '/api/submit')
+                    .map(c => c.apiEndpoint)
+            )];
+
+            const extraRoutes = customEndpoints.map(ep => `
+@app.route('${ep}', methods=['POST'])
+def custom_endpoint_${ep.replace(/[^a-zA-Z0-9]/g, '_')}():
+    """مسار مخصص تم ربطه بزر داخل التطبيق"""
+    data = request.get_json(silent=True) or request.form.to_dict()
+    record = {"endpoint": "${ep}", "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "payload": data}
+    save_record(record)
+    return jsonify({"success": True, "message": "تمت معالجة الطلب عبر ${ep} بنجاح!", "record": record}), 201
+`).join('\n');
+
+            return `# =========================================================
+# مشروع: ${projectName} (يحتوي على ${pages.length} صفحات)
+# تم توليد هذا الخادم البرمجي تلقائياً بواسطة Flutter Me
+# المتطلبات للتشغيل: pip install flask
+# =========================================================
+
+from flask import Flask, request, jsonify, send_file
+from datetime import datetime
+import json
+import os
+
+app = Flask(__name__)
+DB_FILE = 'database.json'
+database_records = []
+
+def save_record(record):
+    """حفظ السجل في الذاكرة ${reqDb ? 'وفي ملف JSON كقاعدة بيانات دائمة' : ''}"""
+    database_records.append(record)
+    ${reqDb ? `with open(DB_FILE, 'w', encoding='utf-8') as f:
+        json.dump(database_records, f, ensure_ascii=False, indent=2)` : 'pass'}
+
+@app.route('/')
+def home():
+    """عرض التطبيق متعدد الصفحات (ملف index.html)"""
+    if os.path.exists('index.html'):
+        return send_file('index.html')
+    return "<h1>خادم Python يعمل بنجاح! ضع ملف index.html في نفس المجلد.</h1>"
+
+@app.route('/api/submit', methods=['POST'])
+def handle_submit():
+    data = request.get_json(silent=True) or request.form.to_dict()
+    record = {"id": len(database_records) + 1, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "data": data}
+    save_record(record)
+    return jsonify({"success": True, "message": "تم حفظ البيانات في خادم Python بنجاح!", "record": record}), 201
+${extraRoutes}
+@app.route('/api/records', methods=['GET'])
+def get_records():
+    return jsonify({"total": len(database_records), "records": database_records})
+
+if __name__ == '__main__':
+    print("🚀 جاري تشغيل خادم ${projectName} على الرابط: http://127.0.0.1:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)
+`;
+        }
+
+        // فتح نافذة الكود وتوليد الأكواد فوراً
+        function openCodeModal() {
+            generatedHtmlCode = buildHtmlCode();
+            generatedPythonCode = buildPythonCode();
+
+            document.getElementById('codeModal').classList.remove('hidden');
+            document.getElementById('codeModal').classList.add('flex');
+            switchCodeTab(currentCodeTab);
+        }
+
+        function closeCodeModal() {
+            document.getElementById('codeModal').classList.add('hidden');
+            document.getElementById('codeModal').classList.remove('flex');
+        }
+
+        // التبديل بين كود HTML وكود Python داخل النافذة
+        function switchCodeTab(tab) {
+            currentCodeTab = tab;
+            const tabHtml = document.getElementById('tabHtml');
+            const tabPython = document.getElementById('tabPython');
+            const codeArea = document.getElementById('codeOutputArea');
+
+            if (tab === 'html') {
+                tabHtml.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-sm transition';
+                tabPython.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 transition';
+                codeArea.textContent = generatedHtmlCode;
+            } else {
+                tabPython.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-sm transition';
+                tabHtml.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 transition';
+                codeArea.textContent = generatedPythonCode;
+            }
+        }
+
+        // نسخ الكود بضغطة زر واحدة مع دعم كامل للمتصفحات
+        function copyActiveCode() {
+            const textToCopy = currentCodeTab === 'html' ? generatedHtmlCode : generatedPythonCode;
+            const textarea = document.createElement('textarea');
+            textarea.value = textToCopy;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+
+            try {
+                document.execCommand('copy');
+                const btnText = document.getElementById('copyBtnText');
+                btnText.textContent = 'تم النسخ بنجاح ✓';
+                showToast(`تم نسخ كود ${currentCodeTab.toUpperCase()} إلى الحافظة!`);
+                setTimeout(() => {
+                    btnText.textContent = 'نسخ الكود';
+                }, 2000);
+            } catch (err) {
+                showToast('حدث خطأ أثناء النسخ، يرجى التحديد يدوياً');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // تحميل الكود كملف جاهز (.html أو .py)
+        function downloadActiveCode() {
+            const text = currentCodeTab === 'html' ? generatedHtmlCode : generatedPythonCode;
+            const filename = currentCodeTab === 'html' ? 'index.html' : 'app.py';
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            showToast(`تم تحميل الملف ${filename}`);
+        }
+
+        // التهيئة الأولية عند فتح التطبيق مباشرة
+        renderPagesBar();
+        renderToolbox();
+        renderCanvas();
+        renderInspector();
+    </script>
+</body>
+</html>
